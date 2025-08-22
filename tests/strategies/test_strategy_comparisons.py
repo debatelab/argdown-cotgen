@@ -13,6 +13,7 @@ from .strategy_test_framework import (
 )
 from src.argdown_cotgen.strategies.argument_maps.by_rank import ByRankStrategy
 from src.argdown_cotgen.strategies.argument_maps.breadth_first import BreadthFirstStrategy
+from src.argdown_cotgen.strategies.argument_maps.depth_first import DepthFirstStrategy
 
 
 class TestStrategyComparisons:
@@ -22,7 +23,8 @@ class TestStrategyComparisons:
         """Set up test fixtures."""
         self.strategies = [
             ByRankStrategy(),
-            BreadthFirstStrategy()
+            BreadthFirstStrategy(),
+            DepthFirstStrategy()
         ]
     
     @pytest.mark.parametrize("test_case", COMMON_STRATEGY_TEST_CASES, ids=lambda tc: tc.name)

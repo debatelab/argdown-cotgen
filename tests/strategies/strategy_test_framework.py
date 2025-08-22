@@ -158,6 +158,25 @@ COMMON_STRATEGY_TEST_CASES = [
             "has_attack": True,
             "max_depth": 3
         }
+    ),
+    
+    StrategyTestCase(
+        name="true_branching_structure",
+        argdown_text="""[Main Argument]: Core claim requiring evidence.
+    <+ <Scientific Branch>: Scientific evidence path.
+        <+ <Study A>: First research study.
+        <+ <Study B>: Second research study.
+    <+ <Economic Branch>: Economic evidence path.
+        <+ <Cost Analysis>: Economic cost study.
+        <+ <Benefit Analysis>: Economic benefit study.""",
+        description="True branching structure that shows breadth vs depth differences",
+        expected_step_count=4,  # Will vary by strategy
+        expected_features={
+            "true_branching": True,
+            "has_support": True,
+            "max_depth": 2,
+            "parallel_branches": True
+        }
     )
 ]
 

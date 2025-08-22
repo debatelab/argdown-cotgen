@@ -30,11 +30,11 @@ Note: Each step shows all nodes up to that rank level with proper indentation.
 """
 
 from typing import List
-from ..base import BaseStrategy, AbortionMixin
-from ...core.models import ArgdownStructure, ArgumentMapStructure, ArgumentMapLine, CotStep, INDENT_SIZE
+from ..base import BaseArgumentMapStrategy, AbortionMixin
+from ...core.models import ArgdownStructure, ArgumentMapStructure, CotStep, INDENT_SIZE
 
 
-class ByRankStrategy(AbortionMixin, BaseStrategy):
+class ByRankStrategy(AbortionMixin, BaseArgumentMapStrategy):
     """
     Rank-based strategy for reconstructing argument maps.
     """
@@ -197,49 +197,6 @@ class ByRankStrategy(AbortionMixin, BaseStrategy):
         
         return "\n".join(lines)
     
-    def _format_line(self, line: ArgumentMapLine, include_yaml: bool = False, 
-                    include_comments: bool = False) -> str:
-        """
-        Convert an ArgumentMapLine back to proper Argdown syntax.
-        
-        Args:
-            line: The ArgumentMapLine to format
-            include_yaml: Whether to include YAML inline data
-            include_comments: Whether to include comments
-            
-        Returns:
-            Formatted Argdown line as string
-        """
-        # Handle standalone comments (empty content but has comment)
-        if not line.content.strip() and include_comments and line.has_comment:
-            indent = " " * (line.indent_level * INDENT_SIZE)
-            return f"{indent}// {line.comment_content}"
-        
-        # Skip empty lines
-        if not line.content.strip():
-            return ""
-        
-        # Build the line with proper indentation
-        indent = " " * (line.indent_level * INDENT_SIZE)
-        
-        # Add dialectical relation if present
-        relation_part = ""
-        if line.support_type and line.indent_level > 0:
-            relation_part = f"{line.support_type.value} "
-        
-        # Build the main content
-        content = line.content
-        
-        # Add YAML inline data if requested and present
-        if include_yaml and line.yaml_inline_data:
-            content += f" {line.yaml_inline_data}"
-        
-        # Add comment if requested and present
-        if include_comments and line.has_comment and line.content.strip():
-            content += f" // {line.comment_content}"
-        
-        return f"{indent}{relation_part}{content}"
-    
     def _get_explanation_for_depth(self, depth: int, max_depth: int) -> str:
         """
         Get appropriate natural language explanation for each depth level.
@@ -257,14 +214,6 @@ class ByRankStrategy(AbortionMixin, BaseStrategy):
             return self._get_random_explanation(self.FINAL_DEPTH_EXPLANATIONS, depth=depth)
         else:
             return self._get_random_explanation(self.INTERMEDIATE_EXPLANATIONS, depth=depth)
-    
-    def _has_yaml_data(self, structure: ArgumentMapStructure) -> bool:
-        """Check if any lines have YAML inline data."""
-        return any(line.yaml_inline_data for line in structure.lines)
-    
-    def _has_comments(self, structure: ArgumentMapStructure) -> bool:
-        """Check if any lines have comments."""
-        return any(line.has_comment for line in structure.lines)
     
     def _has_content_beyond_depth(self, structure: ArgumentMapStructure, max_depth: int) -> bool:
         """Check if there are any content lines beyond the max_depth."""

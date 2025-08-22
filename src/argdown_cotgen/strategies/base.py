@@ -5,7 +5,7 @@ Base strategy interface for generating Chain-of-Thought reasoning traces.
 from abc import ABC, abstractmethod
 from typing import List
 import random
-from ..core.models import ArgdownStructure, CotStep
+from ..core.models import ArgdownStructure, CotStep, ArgumentStructure, ArgumentMapStructure, ArgumentMapLine, INDENT_SIZE
 
 
 class AbortionMixin:
@@ -184,4 +184,61 @@ class BaseStrategy(ABC):
         """
         template = random.choice(explanation_list)
         return template.format(**format_kwargs) if format_kwargs else template
+    
+    def _has_yaml_data(self, structure: ArgumentStructure | ArgumentMapStructure) -> bool:
+        """Check if any lines have YAML inline data."""
+        return any(line.yaml_inline_data for line in structure.lines)
+    
+    def _has_comments(self, structure: ArgumentStructure | ArgumentMapStructure) -> bool:
+        """Check if any lines have comments."""
+        return any(line.has_comment for line in structure.lines)
+    
+
+class BaseArgumentMapStrategy(BaseStrategy):
+    """
+    Abstract base class for all CoT argument map generation strategies.
+    """    
+
+    def _format_line(self, line: ArgumentMapLine, include_yaml: bool = False, 
+                    include_comments: bool = False) -> str:
+        """
+        Convert an ArgumentMapLine back to proper Argdown syntax.
+        
+        Args:
+            line: The ArgumentMapLine to format
+            include_yaml: Whether to include YAML inline data
+            include_comments: Whether to include comments
+            
+        Returns:
+            Formatted Argdown line as string
+        """
+        # Handle standalone comments (empty content but has comment)
+        if not line.content.strip() and include_comments and line.has_comment:
+            indent = " " * (line.indent_level * INDENT_SIZE)
+            return f"{indent}// {line.comment_content}"
+        
+        # Skip empty lines
+        if not line.content.strip():
+            return ""
+        
+        # Build the line with proper indentation
+        indent = " " * (line.indent_level * INDENT_SIZE)
+        
+        # Add dialectical relation if present
+        relation_part = ""
+        if line.support_type and line.indent_level > 0:
+            relation_part = f"{line.support_type.value} "
+        
+        # Build the main content
+        content = line.content
+        
+        # Add YAML inline data if requested and present
+        if include_yaml and line.yaml_inline_data:
+            content += f" {line.yaml_inline_data}"
+        
+        # Add comment if requested and present
+        if include_comments and line.has_comment and line.content.strip():
+            content += f" // {line.comment_content}"
+        
+        return f"{indent}{relation_part}{content}"
     

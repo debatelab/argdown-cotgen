@@ -1,7 +1,7 @@
 """Parser for argdown snippets using indentation-based analysis."""
 
 import re
-from typing import List, Optional, Union
+from typing import List, Optional
 from .models import (
     ArgumentMapLine, 
     ArgumentStatementLine, 
@@ -18,8 +18,8 @@ class ArgdownParser:
     """Parser that uses indentation and line patterns to parse argdown snippets."""
     
     # Patterns for argument maps
-    DIALECTICAL_PATTERN = re.compile(r'^(\s*)(<[+\-_]|><|\+>|\->|_>)\s*')
-    DIALECTICAL_WITH_ARG_PATTERN = re.compile(r'^(\s*)(<[+\-_]|><|\+>|\->|_>)\s*<([^>]+)>:\s*(.+)$')
+    DIALECTICAL_PATTERN = re.compile(r'^(\s*)(<[+\-_]|><|\+>|\->|_>|[+\-])\s*')
+    DIALECTICAL_WITH_ARG_PATTERN = re.compile(r'^(\s*)(<[+\-_]|><|\+>|\->|_>|[+\-])\s*<([^>]+)>:\s*(.+)$')
     CLAIM_PATTERN = re.compile(r'^(\s*)\[([^\]]+)\]:\s*(.+)$')
     ARGUMENT_PATTERN = re.compile(r'^(\s*)<([^>]+)>:\s*(.+)$')
     
@@ -261,6 +261,8 @@ class ArgdownParser:
         symbol_map = {
             '<+': DialecticalType.SUPPORTS,
             '<-': DialecticalType.ATTACKS,
+            '+': DialecticalType.SUPPORTS,
+            '-': DialecticalType.ATTACKS,
             '<_': DialecticalType.UNDERCUTS,
             '><': DialecticalType.CONTRADICTORY,
             '+>': DialecticalType.IS_SUPPORTED_BY,

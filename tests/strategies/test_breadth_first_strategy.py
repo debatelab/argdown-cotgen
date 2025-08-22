@@ -1,5 +1,10 @@
 """
 Tests for BreadthFirstStrategy using the common testing framework.
+
+This file serves as a REFERENCE IMPLEMENTATION for new strategy test files.
+See strategy_test_framework.py docstring for detailed documentation.
+
+CRITICAL: Use @property methods (not @pytest.fixture) for strategy_class and strategy_name!
 """
 
 from typing import Type

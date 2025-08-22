@@ -30,6 +30,8 @@ def parser():
 DIALECTICAL_TYPE_CASES = [
     ("<+", DialecticalType.SUPPORTS),
     ("<-", DialecticalType.ATTACKS),
+    ("+", DialecticalType.SUPPORTS),
+    ("-", DialecticalType.ATTACKS),
     ("<_", DialecticalType.UNDERCUTS),
     ("><", DialecticalType.CONTRADICTORY),
     ("+>", DialecticalType.IS_SUPPORTED_BY),

@@ -41,6 +41,25 @@ ARGUMENT_MAP_SNIPPETS = [
     ),
 
     SnippetTestCase(
+        name="basic_support_attack_plus_minus",
+        snippet="""
+[Main claim]: This is the main claim.
+    + <Argument 1>: The first reason.
+    + <Argument 2>: The second reason.
+    - <Objection>: An objection to the main claim.
+        - <Rebuttal>: The objection can be rebutted.
+""",
+        expected_type=SnippetType.ARGUMENT_MAP,
+        description="Basic argument map with support and attack relations +/-",
+        expected_properties={
+            "max_depth": 2,
+            "main_claim_content": "Main claim",
+            "first_level_count": 3,
+            "second_level_count": 1
+        }
+    ),
+
+    SnippetTestCase(
         name="basic_support_attack_with_comments",
         snippet="""
 [Main claim]: This is the main claim.

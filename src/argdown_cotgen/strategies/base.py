@@ -234,7 +234,8 @@ class BaseArgumentMapStrategy(BaseStrategy):
         
         # Add YAML inline data if requested and present
         if include_yaml and line.yaml_inline_data:
-            content += f" {line.yaml_inline_data}"
+            # Remove trailing spaces from content before adding YAML to avoid double spaces
+            content = content.rstrip() + f" {line.yaml_inline_data}"
         
         # Add comment if requested and present
         if include_comments and line.has_comment and line.content.strip():

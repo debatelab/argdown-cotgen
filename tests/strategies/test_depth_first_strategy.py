@@ -5,8 +5,9 @@ This module contains comprehensive tests for the depth-first argument map strate
 including both common framework tests and depth-first specific behavior validation.
 """
 
-import pytest
+from typing import Type
 from src.argdown_cotgen.strategies.argument_maps.depth_first import DepthFirstStrategy
+from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 from src.argdown_cotgen.core.parser import ArgdownParser
 from .strategy_test_framework import BaseStrategyTestSuite, COMMON_STRATEGY_TEST_CASES
 
@@ -14,10 +15,13 @@ from .strategy_test_framework import BaseStrategyTestSuite, COMMON_STRATEGY_TEST
 class TestDepthFirstStrategy(BaseStrategyTestSuite):
     """Test suite for DepthFirstStrategy using the common framework."""
     
-    @pytest.fixture
-    def strategy(self):
-        """Provide the strategy instance for testing."""
-        return DepthFirstStrategy()
+    @property
+    def strategy_class(self) -> Type[BaseArgumentMapStrategy]:
+        return DepthFirstStrategy
+    
+    @property
+    def strategy_name(self) -> str:
+        return "DepthFirstStrategy"
 
 
 class TestDepthFirstSpecificBehavior:

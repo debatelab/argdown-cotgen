@@ -38,16 +38,24 @@ tests/
 1. **Create a new test file in `tests/strategies/`**:
 
 ```python
+from typing import Type
 from tests.strategies.strategy_test_framework import BaseStrategyTestSuite
 from src.argdown_cotgen.strategies.argument_maps.my_strategy import MyStrategy
+from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 
 class TestMyStrategy(BaseStrategyTestSuite):
+    """Test suite for MyStrategy using the common framework."""
+    
     @property
-    def strategy_class(self):
+    def strategy_class(self) -> Type[BaseArgumentMapStrategy]:
         return MyStrategy
     
     @property  
-    def strategy_name(self):
+    def strategy_name(self) -> str:
+        return "MyStrategy"
+```
+
+⚠️ **Important**: Use `@property` methods, NOT `@pytest.fixture`. Fixtures will prevent the common test cases from being collected properly.
         return "MyStrategy"
 ```
 
@@ -101,6 +109,12 @@ Every strategy automatically gets tested for:
    - High abortion rate handling
    - First step always clean
 
+5. **Content Reconstruction**:
+   - Final step exactly reconstructs original input
+   - No missing content from original argdown
+   - No extra content beyond original
+   - Proper YAML and comment formatting
+
 #### Customization Hooks
 
 Override these methods for strategy-specific behavior:
@@ -116,6 +130,76 @@ def _validate_features(self, steps, structure, expected):
     # Custom feature validation
     super()._validate_features(steps, structure, expected)
 ```
+
+## Common Pitfalls and Solutions
+
+### ❌ Wrong Inheritance Pattern
+
+**Problem**: Using `@pytest.fixture` instead of `@property`
+
+```python
+# WRONG - This prevents common test collection
+class TestMyStrategy(BaseStrategyTestSuite):
+    @pytest.fixture
+    def strategy(self):
+        return MyStrategy()
+```
+
+**Solution**: Use properties with proper type hints
+
+```python
+# CORRECT - This enables proper test inheritance
+class TestMyStrategy(BaseStrategyTestSuite):
+    @property
+    def strategy_class(self) -> Type[BaseArgumentMapStrategy]:
+        return MyStrategy
+    
+    @property
+    def strategy_name(self) -> str:
+        return "MyStrategy"
+```
+
+### ❌ Missing Type Imports
+
+**Problem**: Missing required imports for type hints
+
+```python
+# WRONG - Missing imports
+from tests.strategies.strategy_test_framework import BaseStrategyTestSuite
+```
+
+**Solution**: Include all required imports
+
+```python
+# CORRECT - All imports included
+from typing import Type
+from tests.strategies.strategy_test_framework import BaseStrategyTestSuite
+from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
+```
+
+### ❌ Content Reconstruction Issues
+
+**Problem**: Strategy doesn't properly reconstruct original content (YAML spacing, missing content)
+
+The framework automatically validates that `steps[-1].content` exactly matches the original input. Common issues:
+- Extra spaces before YAML data
+- Missing YAML or comments in final step
+- Incorrect indentation or formatting
+
+**Solution**: Ensure your strategy's `_format_line()` method properly handles spacing and reconstruction.
+
+## Content Reconstruction Validation
+
+The framework automatically validates that the final generated step exactly reconstructs the original argdown input. This ensures:
+
+1. **No Lost Content**: Every line from the original is present in the final step
+2. **No Extra Content**: Final step doesn't add content not in the original  
+3. **Exact Formatting**: YAML, comments, and indentation match precisely
+
+This validation catches common bugs like:
+- YAML spacing issues (`content += f" {yaml}"` → `content.rstrip() + f" {yaml}"`)
+- Missing content in final reconstruction
+- Incorrect formatting or line ordering
 
 ## Testing Different Strategies Together
 
@@ -213,12 +297,20 @@ uv run python -m pytest tests/ -v
 
 ## Test Statistics
 
-Current test coverage (126 total tests, 35 strategy-specific):
+Current test coverage (163 total tests, 96 strategy-specific):
 
-- **Framework Tests**: 35 new parametrized tests across strategies
-- **ByRankStrategy**: 14 tests (new framework) 
-- **BreadthFirstStrategy**: 13 tests (new framework)
-- **Comparison Tests**: 8 cross-strategy tests
-- **Core Tests**: 91 tests for parser, formatter, and other components
+- **Strategy Framework Tests**: 96 comprehensive tests across all strategies
+  - **BreadthFirstStrategy**: 20 tests (14 common + 6 specific)
+  - **ByRankStrategy**: 20 tests (14 common + 6 specific) 
+  - **ByObjectionStrategy**: 23 tests (14 common + 9 specific)
+  - **DepthFirstStrategy**: 20 tests (14 common + 6 specific)
+  - **Comparison Tests**: 13 cross-strategy tests
+- **Core Tests**: 67 tests for parser, formatter, and other components
+
+### Common Tests Per Strategy (14 each)
+- 10 parametrized common test cases (simple_two_level, with_yaml, etc.)
+- 4 framework tests (wrong_structure_type, empty_lines_handling, etc.)
+- Content reconstruction validation for all tests
+- Quality assurance for explanations and step progression
 
 The organized framework in `tests/strategies/` ensures comprehensive, consistent, and maintainable testing for all current and future argument map strategies.

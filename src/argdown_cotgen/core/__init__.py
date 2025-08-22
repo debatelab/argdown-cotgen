@@ -7,8 +7,10 @@ from .models import (
     SnippetType,
     DialecticalType,
     CotStep,
+    CotResult,
     ArgumentMapLine,
-    ArgumentStatementLine
+    ArgumentStatementLine,
+    INDENT_SIZE
 )
 from .parser import ArgdownParser
 
@@ -19,7 +21,9 @@ __all__ = [
     "SnippetType",
     "DialecticalType",
     "CotStep",
+    "CotResult",
     "ArgumentMapLine",
     "ArgumentStatementLine",
+    "INDENT_SIZE",
     "ArgdownParser"
 ]

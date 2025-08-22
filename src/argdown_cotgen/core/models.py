@@ -5,6 +5,10 @@ from typing import List, Optional, Union
 from enum import Enum
 
 
+# Constants for Argdown formatting
+INDENT_SIZE = 4  # Number of spaces per indentation level
+
+
 class SnippetType(Enum):
     """Type of argdown snippet."""
     ARGUMENT_MAP = "argument_map"
@@ -30,6 +34,7 @@ class ArgumentLine:
     original_line: str
     has_comment: bool = False
     comment_content: Optional[str] = None
+    yaml_inline_data: Optional[str] = None
 
 
 @dataclass
@@ -149,7 +154,15 @@ ArgdownStructure = Union[ArgumentMapStructure, ArgumentStructure]
 
 @dataclass
 class CotStep:
-    """Represents a single step in a chain of thought generation."""
+    """Represents a single step in a Chain-of-Thought reasoning trace."""
     version: str
-    description: str
-    argdown_content: str
+    content: str
+    explanation: str = ""
+
+
+@dataclass
+class CotResult:
+    """Result of Chain-of-Thought generation."""
+    steps: List['CotStep']
+    input_type: str
+    strategy_name: str

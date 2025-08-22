@@ -1,0 +1,187 @@
+"""
+Base strategy interface for generating Chain-of-Thought reasoning traces.
+"""
+
+from abc import ABC, abstractmethod
+from typing import List
+import random
+from ..core.models import ArgdownStructure, CotStep
+
+
+class AbortionMixin:
+    """
+    Mixin class that provides abortion functionality for CoT strategies.
+    
+    This mixin allows strategies to introduce realistic AI reconstruction errors
+    with repetitions followed by abortion and retry attempts.
+    
+    Note: This mixin assumes the class it's mixed into has:
+    - _create_step method (provided by BaseStrategy)
+    - _get_random_explanation method (provided by BaseStrategy)
+    """
+    
+    # Universal abortion and retry comments with emoji support
+    ABORTION_COMMENTS = [
+        "Oh no! This is just exactly what I've written before. Better ABORT and DISCARD this, and start anew.",
+        "Oops! I just repeated myself. Let me discard this and try again.",
+        "Fatal block repetition detected! Aborting this version and starting over.",
+        "Detected fatal repetitions. Let me abort this step now and start afresh.",
+        "Wait, I'm repeating content! Let me abort and redo this step.",
+        "Error: Duplicate content found. Discarding this attempt and trying again.",
+        "🚨 ABORT! I'm duplicating content here. Let me start over.",
+        "❌ Fatal repetition error! Discarding this attempt and trying again.",
+        "🛑 Wait, this is exactly what I wrote before! Better abort and restart.",
+        "🚨 Repetition detected! Let me abort this version and try fresh.",
+        "‼️ Oops! Duplicate content alert. Aborting and starting anew.",
+        "⚠️ Error: I'm repeating myself. Time to abort and redo this step."
+    ]
+    
+    RETRY_COMMENTS = [
+        "🚮 I ignore the above Argdown snippet and will try again.",
+        "Let me start over with this step.",
+        "🚮 I'll discard the previous attempt and redo this step.",
+        "Starting fresh with this reconstruction step.",
+        "Let me try this step again without the repetitions.",
+        "🔄 Let me restart this step from scratch.",
+        "✨ Starting fresh with a clean slate for this step.",
+        "🆕 Ignoring the previous attempt, let me try again.",
+        "🔄 Let me focus and redo this step properly.",
+        "🧹 Clearing the slate and reconstructing this step anew.",
+        "🆕 Fresh start! Let me rebuild this step correctly."
+    ]
+    
+    def _introduce_repetitions_with_abortion(self, steps: List[CotStep], 
+                                           abortion_rate: float = 0.1) -> List[CotStep]:
+        """
+        Post-process steps to introduce repetitions and abortion comments.
+        
+        Args:
+            steps: List of CoT steps to process
+            abortion_rate: Probability of introducing abortion (0.0 to 1.0)
+            
+        Returns:
+            List of steps with some potentially having abortion and retry
+        """
+        if abortion_rate <= 0.0:
+            return steps
+            
+        processed_steps = []
+        
+        for step in steps:
+            # Randomly decide if this step should have abortion
+            if random.random() < abortion_rate and len(step.content.split('\n')) >= 3:
+                # Create the aborted version with repetitions
+                aborted_step = self._create_aborted_version(step)
+                processed_steps.append(aborted_step)
+                
+                # Create the retry version (clean original)
+                retry_explanation = self._get_random_explanation(self.RETRY_COMMENTS)  # type: ignore
+                # This relies on the mixed-in class having _create_step method
+                retry_step = self._create_step(  # type: ignore
+                    step.version,  # Same version number
+                    step.content,  # Original clean content
+                    retry_explanation
+                )
+                processed_steps.append(retry_step)
+            else:
+                # Keep the original step
+                processed_steps.append(step)
+                
+        return processed_steps
+    
+    def _create_aborted_version(self, step: CotStep) -> CotStep:
+        """
+        Create an aborted version of a step by introducing repetitions.
+        
+        Args:
+            step: Original step to create aborted version from
+            
+        Returns:
+            New step with repetitions and abortion comment
+        """
+        lines = step.content.split('\n')
+        non_empty_lines = [i for i, line in enumerate(lines) if line.strip() and not line.strip().startswith('//')]
+        
+        if len(non_empty_lines) < 2:
+            return step  # Can't create meaningful repetition
+            
+        # Choose repetition size (1, 2, or 3 lines)
+        repetition_size = random.choice([1, 2, 3])
+        
+        # Find a suitable starting point for repetition (early in the content)
+        max_start = min(len(non_empty_lines) - repetition_size, len(non_empty_lines) // 2)
+        if max_start < 0:
+            repetition_size = 1
+            max_start = len(non_empty_lines) - 1
+            
+        if max_start >= 0:
+            start_idx = random.randint(0, max_start)
+            
+            # Get the lines to repeat (in original line indices)
+            lines_to_repeat_indices = non_empty_lines[start_idx:start_idx + repetition_size]
+            lines_to_repeat = [lines[i] for i in lines_to_repeat_indices]
+            
+            # Insert the repetition after the original block
+            insertion_point = lines_to_repeat_indices[-1] + 1
+            
+            # Create the distorted content - but STOP after the repetition point
+            # Include content up to the insertion point, then add repetition, then ABORT
+            distorted_lines = lines[:insertion_point] + lines_to_repeat
+            
+            # Add abortion comment immediately after the repetition
+            if not hasattr(self, '_get_random_explanation'):
+                raise NotImplementedError("AbortionMixin can only be used with classes that implement _get_random_explanation method.")
+            abortion_comment = f"// {self._get_random_explanation(self.ABORTION_COMMENTS)}"  # type: ignore
+            distorted_lines.append(abortion_comment)
+            
+            distorted_content = '\n'.join(distorted_lines)
+            
+            # This relies on the mixed-in class having _create_step method
+            if not hasattr(self, '_create_step'):
+                raise NotImplementedError("AbortionMixin can only be used with classes that implement _create_step method.")
+            return self._create_step(  # type: ignore
+                step.version,
+                distorted_content,
+                step.explanation
+            )
+        
+        return step
+
+
+class BaseStrategy(ABC):
+    """
+    Abstract base class for all CoT generation strategies.
+    """
+    
+    @abstractmethod
+    def generate(self, parsed_structure: ArgdownStructure, abortion_rate: float = 0.0) -> List[CotStep]:
+        """
+        Generate a sequence of CoT steps from a parsed Argdown structure.
+        
+        Args:
+            parsed_structure: The parsed Argdown structure
+            abortion_rate: Probability of introducing abortion (0.0 to 1.0)
+            
+        Returns:
+            A list of CotStep objects representing the reasoning trace
+        """
+        pass
+    
+    def _create_step(self, version: str, content: str, explanation: str = "") -> CotStep:
+        """Helper method to create a CoT step."""
+        return CotStep(version, content, explanation)
+    
+    def _get_random_explanation(self, explanation_list: List[str], **format_kwargs) -> str:
+        """
+        Randomly select and format an explanation from the given list.
+        
+        Args:
+            explanation_list: List of explanation templates
+            **format_kwargs: Keyword arguments for string formatting
+            
+        Returns:
+            Randomly selected and formatted explanation
+        """
+        template = random.choice(explanation_list)
+        return template.format(**format_kwargs) if format_kwargs else template
+    

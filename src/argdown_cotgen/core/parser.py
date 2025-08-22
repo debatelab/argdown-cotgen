@@ -9,7 +9,8 @@ from .models import (
     ArgumentStructure,
     ArgdownStructure,
     SnippetType,
-    DialecticalType
+    DialecticalType,
+    INDENT_SIZE
 )
 
 
@@ -26,6 +27,33 @@ class ArgdownParser:
     INLINE_COMMENT_PATTERN = re.compile(r'^(.+?)//\s*(.*)$')
     STANDALONE_COMMENT_PATTERN = re.compile(r'^(\s*)//\s*(.*)$')
     MULTILINE_COMMENT_PATTERN = re.compile(r'/\*.*?\*/', re.DOTALL)
+    # YAML inline data pattern (matches {...} at end of line, before optional comment)
+    # Uses a more sophisticated pattern to handle nested braces
+    YAML_INLINE_PATTERN = re.compile(r'\{(?:[^{}]|{[^}]*})*\}(?=\s*(//|$))')
+    def _extract_yaml_and_comment(self, line: str) -> tuple[str, Optional[str], bool, Optional[str]]:
+        """Extract YAML inline data and comment from line.
+        Returns (cleaned_line, yaml_inline_data, has_comment, comment_content)
+        """
+        yaml_inline_data = None
+        # Extract YAML inline data first
+        yaml_match = self.YAML_INLINE_PATTERN.search(line)
+        if yaml_match:
+            yaml_inline_data = yaml_match.group(0)
+            # Remove YAML from line
+            line = line[:yaml_match.start()] + line[yaml_match.end():]
+        # Now extract comment
+        inline_match = self.INLINE_COMMENT_PATTERN.match(line)
+        if inline_match:
+            cleaned_line = inline_match.group(1).rstrip()
+            comment_content = inline_match.group(2).strip()
+            return cleaned_line, yaml_inline_data, True, comment_content
+        # Check for standalone comments
+        standalone_match = self.STANDALONE_COMMENT_PATTERN.match(line)
+        if standalone_match:
+            comment_content = standalone_match.group(2).strip()
+            return "", yaml_inline_data, True, comment_content
+        # No comment found
+        return line, yaml_inline_data, False, None
     
     # Patterns for arguments  
     NUMBERED_STATEMENT_PATTERN = re.compile(r'^(\s*)\((\d+)\)\s*(.+)$')
@@ -85,14 +113,11 @@ class ArgdownParser:
     def _parse_argument_map(self, lines: List[str]) -> ArgumentMapStructure:
         """Parse an argument map structure."""
         parsed_lines = []
-        
         for i, line in enumerate(lines):
-            # Extract comments first
-            cleaned_line, has_comment, comment_content = self._extract_comment(line)
-            
+            # Extract YAML and comments first
+            cleaned_line, yaml_inline_data, has_comment, comment_content = self._extract_yaml_and_comment(line)
             indent_level = self._calculate_indent_level(cleaned_line)
             content = cleaned_line.strip()
-            
             # Handle empty lines (including standalone comments)
             if not content:
                 parsed_line = ArgumentMapLine(
@@ -104,11 +129,11 @@ class ArgdownParser:
                     label=None,
                     is_claim=False,
                     has_comment=has_comment,
-                    comment_content=comment_content
+                    comment_content=comment_content,
+                    yaml_inline_data=yaml_inline_data
                 )
                 parsed_lines.append(parsed_line)
                 continue
-            
             # Check for dialectical relations with arguments: +> <Arg>: content
             dialectical_arg_match = self.DIALECTICAL_WITH_ARG_PATTERN.match(cleaned_line)
             support_type = None
@@ -126,7 +151,6 @@ class ArgdownParser:
                     support_symbol = dialectical_match.group(2)
                     support_type = self._parse_dialectical_type(support_symbol)
                     content = cleaned_line[dialectical_match.end():].strip()
-                
                 # Check for claims [Claim]: content
                 claim_match = self.CLAIM_PATTERN.match(cleaned_line)
                 if claim_match:
@@ -146,7 +170,6 @@ class ArgdownParser:
                     else:
                         label = None
                         is_claim = False
-            
             parsed_line = ArgumentMapLine(
                 content=content,
                 indent_level=indent_level,
@@ -156,23 +179,20 @@ class ArgdownParser:
                 label=label,
                 is_claim=is_claim,
                 has_comment=has_comment,
-                comment_content=comment_content
+                comment_content=comment_content,
+                yaml_inline_data=yaml_inline_data
             )
             parsed_lines.append(parsed_line)
-        
         return ArgumentMapStructure(parsed_lines)
     
     def _parse_argument(self, lines: List[str]) -> ArgumentStructure:
         """Parse an argument structure."""
         parsed_lines = []
-        
         for i, line in enumerate(lines):
-            # Extract comments first
-            cleaned_line, has_comment, comment_content = self._extract_comment(line)
-            
+            # Extract YAML and comments first
+            cleaned_line, yaml_inline_data, has_comment, comment_content = self._extract_yaml_and_comment(line)
             indent_level = self._calculate_indent_level(cleaned_line)
             content = cleaned_line.strip()
-            
             # Handle empty lines (including standalone comments)
             if not content:
                 parsed_line = ArgumentStatementLine(
@@ -187,37 +207,30 @@ class ArgdownParser:
                     is_separator=False,
                     is_preamble=False,
                     has_comment=has_comment,
-                    comment_content=comment_content
+                    comment_content=comment_content,
+                    yaml_inline_data=yaml_inline_data
                 )
                 parsed_lines.append(parsed_line)
                 continue
-            
             # Check for numbered statements
             numbered_match = self.NUMBERED_STATEMENT_PATTERN.match(cleaned_line)
             statement_number = None
             is_premise = False
             is_conclusion = False
-            
             if numbered_match:
                 statement_number = int(numbered_match.group(2))
                 content = f"({statement_number}) {numbered_match.group(3)}"
-                # Determine if premise or conclusion based on position/context
-                # For now, we'll classify the last numbered statement as conclusion
                 is_premise = True  # Will be refined later
-            
             # Check for inference rules
             is_inference_rule = bool(self.INFERENCE_RULE_PATTERN.match(cleaned_line))
-            
             # Check for separators
             is_separator = bool(self.SEPARATOR_PATTERN.match(cleaned_line))
-            
             # Check for preamble (title and gist)
             is_preamble = False
             preamble_match = self.PREAMBLE_PATTERN.match(cleaned_line)
             if preamble_match and not numbered_match:
                 is_preamble = True
                 content = f"<{preamble_match.group(2)}>: {preamble_match.group(3)}"
-            
             parsed_line = ArgumentStatementLine(
                 content=content,
                 indent_level=indent_level,
@@ -230,19 +243,18 @@ class ArgdownParser:
                 is_separator=is_separator,
                 is_preamble=is_preamble,
                 has_comment=has_comment,
-                comment_content=comment_content
+                comment_content=comment_content,
+                yaml_inline_data=yaml_inline_data
             )
             parsed_lines.append(parsed_line)
-        
         # Post-process to identify final conclusion
         self._identify_conclusions(parsed_lines)
-        
         return ArgumentStructure(parsed_lines)
     
     def _calculate_indent_level(self, line: str) -> int:
-        """Calculate indentation level (number of 4-space units)."""
+        """Calculate indentation level (number of INDENT_SIZE-space units)."""
         leading_spaces = len(line) - len(line.lstrip())
-        return leading_spaces // 4
+        return leading_spaces // INDENT_SIZE
     
     def _parse_dialectical_type(self, symbol: str) -> DialecticalType:
         """Parse dialectical relation symbol into DialecticalType."""

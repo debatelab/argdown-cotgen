@@ -414,7 +414,7 @@ class BaseStrategyTestSuite(ABC):
         argdown_text = """[Main]: Main claim.
     <+ <Support>: Supporting evidence.
         <+ <Deep>: Deep support."""
-        
+    
         structure = self.parser.parse(argdown_text)
         
         # Test with maximum abortion rate
@@ -423,8 +423,35 @@ class BaseStrategyTestSuite(ABC):
         # Should still produce at least one step
         assert len(steps) >= 1
         
-        # First step should always be clean (no abortion in first step)
-        assert "//" not in steps[0].explanation or "abort" not in steps[0].explanation.lower()
+        # 1. Check that the LAST step is not aborted
+        last_step = steps[-1]
+        assert not self._is_step_aborted(last_step), \
+            "Last step should never be aborted - must end with clean content"
+        
+        # 2. Check that with abortion_rate=1.0, at least one abortion occurs somewhere
+        abortion_found = any(self._is_step_aborted(step) for step in steps)
+        assert abortion_found, \
+            "With abortion_rate=1.0, at least one abortion should occur"
+
+    def _is_step_aborted(self, step: CotStep) -> bool:
+        """
+        Check if a step contains abortion by looking for ABORTION_COMMENTS.
+        
+        This uses the actual ABORTION_COMMENTS from base.py to robustly detect
+        abortion without relying on fragile string matching.
+        """
+        from src.argdown_cotgen.strategies.base import AbortionMixin
+        
+        # Check if step content contains any abortion comment
+        step_content_lower = step.content.lower()
+        
+        for abort_comment in AbortionMixin.ABORTION_COMMENTS:
+            # Extract the key part of the comment (without "//" prefix that gets added)
+            comment_core = abort_comment.lower().strip()
+            if comment_core in step_content_lower:
+                return True
+        
+        return False
     
     # === Strategy-Specific Hooks ===
     

@@ -24,6 +24,7 @@ class DialecticalType(Enum):
     IS_SUPPORTED_BY = "+>"
     IS_ATTACKED_BY = "->"
     IS_UNDERCUT_BY = "_>"
+    UNKNOWN = "??"
 
 @dataclass
 class ArgumentLine:

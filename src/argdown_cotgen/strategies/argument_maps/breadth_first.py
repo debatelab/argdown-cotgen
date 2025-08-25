@@ -54,7 +54,7 @@ class BreadthFirstStrategy(AbortionMixin, BaseArgumentMapStrategy):
     
     PROCESSING_EXPLANATIONS = [
         "Now I'll check '{node}' and show any arguments or claims directly related to it.",
-        "Let me consider '{node}' and add its direct children.",
+        "Let me consider '{node}' and add its direct children to the Argdown map.",
         "I'll now examine '{node}' and reveal any supporting and or attacking reasons.",
         "Processing '{node}' - I'll add immediate reasons and objections.",
         "Let me next expand '{node}'."

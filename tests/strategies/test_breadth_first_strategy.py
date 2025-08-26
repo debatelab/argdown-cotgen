@@ -2,19 +2,19 @@
 Tests for BreadthFirstStrategy using the common testing framework.
 
 This file serves as a REFERENCE IMPLEMENTATION for new strategy test files.
-See strategy_test_framework.py docstring for detailed documentation.
+See map_strategy_test_framework.py docstring for detailed documentation.
 
 CRITICAL: Use @property methods (not @pytest.fixture) for strategy_class and strategy_name!
 """
 
 from typing import Type
 
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 from src.argdown_cotgen.strategies.argument_maps.breadth_first import BreadthFirstStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 
 
-class TestBreadthFirstStrategy(BaseStrategyTestSuite):
+class TestBreadthFirstStrategy(BaseMapStrategyTestSuite):
     """Test suite for BreadthFirstStrategy."""
     
     @property

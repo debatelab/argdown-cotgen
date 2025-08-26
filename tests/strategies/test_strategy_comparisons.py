@@ -6,7 +6,7 @@ for the same input, demonstrating their unique approaches.
 """
 
 import pytest
-from .strategy_test_framework import (
+from .map_strategy_test_framework import (
     run_strategy_comparison, 
     assert_strategies_differ,
     COMMON_STRATEGY_TEST_CASES
@@ -47,7 +47,7 @@ class TestStrategyComparisons:
     <+ <B>: Support B.
         <+ <B1>: Deep support for B."""
         
-        from .strategy_test_framework import StrategyTestCase
+        from .map_strategy_test_framework import StrategyTestCase
         test_case = StrategyTestCase(
             name="ordering_test",
             argdown_text=test_case_text,
@@ -105,7 +105,7 @@ class TestStrategyComparisons:
         test_case_text = """[Main]: Main claim.
     <+ <Support>: Supporting evidence."""
         
-        from .strategy_test_framework import StrategyTestCase
+        from .map_strategy_test_framework import StrategyTestCase
         test_case = StrategyTestCase(
             name="explanation_test",
             argdown_text=test_case_text,

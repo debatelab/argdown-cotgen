@@ -2,7 +2,7 @@
 Test suite for RandomDiffusionStrategy using the common testing framework.
 
 This module provides comprehensive testing for the RandomDiffusionStrategy including:
-- Framework automatic tests (14 tests from BaseStrategyTestSuite)
+- Framework automatic tests (14 tests from BaseMapStrategyTestSuite)
 - Strategy-specific error mechanism tests (5 tests)
 - Strategy behavior tests (3 tests, skipping 2 as requested)
 - Edge cases and error handling tests (3 tests)
@@ -23,10 +23,10 @@ from src.argdown_cotgen.strategies.argument_maps.random_diffusion import (
 )
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 from src.argdown_cotgen.core.models import ArgumentMapStructure
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 
 
-class TestRandomDiffusionStrategy(BaseStrategyTestSuite):
+class TestRandomDiffusionStrategy(BaseMapStrategyTestSuite):
     """Test suite for RandomDiffusionStrategy using the common framework."""
     
     @property

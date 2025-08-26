@@ -9,10 +9,10 @@ from typing import Type
 from src.argdown_cotgen.strategies.argument_maps.depth_first import DepthFirstStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 from src.argdown_cotgen.core.parser import ArgdownParser
-from .strategy_test_framework import BaseStrategyTestSuite, COMMON_STRATEGY_TEST_CASES
+from .map_strategy_test_framework import BaseMapStrategyTestSuite, COMMON_STRATEGY_TEST_CASES
 
 
-class TestDepthFirstStrategy(BaseStrategyTestSuite):
+class TestDepthFirstStrategy(BaseMapStrategyTestSuite):
     """Test suite for DepthFirstStrategy using the common framework."""
     
     @property

@@ -12,9 +12,9 @@ Create `tests/strategies/test_your_strategy.py`:
 from typing import Type
 from src.argdown_cotgen.strategies.argument_maps.your_strategy import YourStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 
-class TestYourStrategy(BaseStrategyTestSuite):
+class TestYourStrategy(BaseMapStrategyTestSuite):
     """Test suite for YourStrategy using the common framework."""
     
     @property
@@ -30,7 +30,7 @@ class TestYourStrategy(BaseStrategyTestSuite):
 
 ⚠️ **Use `@property` NOT `@pytest.fixture`** - fixtures break test collection!
 
-✅ **Must inherit from `BaseStrategyTestSuite`**
+✅ **Must inherit from `BaseMapStrategyTestSuite`**
 
 ✅ **Must implement both `strategy_class` and `strategy_name` properties**
 

@@ -7,12 +7,12 @@ and demonstrates how to use the common testing framework.
 
 from typing import Type
 
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 from src.argdown_cotgen.strategies.argument_maps.by_rank import ByRankStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 
 
-class TestByRankStrategy(BaseStrategyTestSuite):
+class TestByRankStrategy(BaseMapStrategyTestSuite):
     """Test suite for ByRankStrategy."""
     
     @property

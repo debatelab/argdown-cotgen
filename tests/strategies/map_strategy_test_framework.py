@@ -18,9 +18,9 @@ To create a test suite for a new strategy, follow this exact pattern:
 from typing import Type
 from src.argdown_cotgen.strategies.argument_maps.your_strategy import YourStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 
-class TestYourStrategy(BaseStrategyTestSuite):
+class TestYourStrategy(BaseMapStrategyTestSuite):
     '''Test suite for YourStrategy using the common framework.'''
     
     @property
@@ -42,7 +42,7 @@ class TestYourStrategySpecificBehavior:
 
 CRITICAL REQUIREMENTS:
 ======================
-- MUST inherit from BaseStrategyTestSuite
+- MUST inherit from BaseMapStrategyTestSuite
 - MUST implement strategy_class and strategy_name as @property methods
 - DO NOT use @pytest.fixture for strategy/strategy_class
 - The property approach ensures pytest collects all common test cases
@@ -50,7 +50,7 @@ CRITICAL REQUIREMENTS:
 
 AUTOMATIC TEST COVERAGE:
 ========================
-By inheriting from BaseStrategyTestSuite, your strategy automatically gets:
+By inheriting from BaseMapStrategyTestSuite, your strategy automatically gets:
 - 10 common test cases (simple_two_level, deep_nesting, with_yaml, etc.)
 - 4 framework tests (wrong_structure_type, empty_lines_handling, etc.)  
 - Content reconstruction validation (ensures final step = original content)
@@ -246,13 +246,13 @@ COMMON_STRATEGY_TEST_CASES = [
 ]
 
 
-class BaseStrategyTestSuite(ABC):
+class BaseMapStrategyTestSuite(ABC):
     """
-    Abstract base class for strategy test suites.
+    Abstract base class for argument map strategy test suites.
     
     This class provides comprehensive testing for argument map strategies by running
-    a suite of common test cases and validations. All strategy implementations should
-    inherit from this class to ensure consistent quality and behavior.
+    a suite of common test cases and validations. All argument map strategy implementations 
+    should inherit from this class to ensure consistent quality and behavior.
     
     INHERITANCE REQUIREMENTS:
     ========================
@@ -310,7 +310,7 @@ class BaseStrategyTestSuite(ABC):
     ======================
     ❌ Using @pytest.fixture for strategy - causes test collection failures
     ❌ Missing strategy_class or strategy_name properties
-    ❌ Not inheriting from BaseStrategyTestSuite
+    ❌ Not inheriting from BaseMapStrategyTestSuite
     ❌ Using relative imports incorrectly
     
     EXAMPLE IMPLEMENTATION:

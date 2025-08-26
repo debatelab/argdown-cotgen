@@ -2,7 +2,7 @@
 Test suite for DepthDiffusionStrategy using the common testing framework.
 
 This module provides comprehensive testing for the DepthDiffusionStrategy including:
-- Framework automatic tests (14 tests from BaseStrategyTestSuite)
+- Framework automatic tests (14 tests from BaseMapStrategyTestSuite)
 - Helper class tests (8 tests for DepthAnalyzer and ShuffleManager)
 - Strategy behavior tests (4 tests for depth progression and placeholders)
 - Edge cases and error handling tests (4 tests)
@@ -22,10 +22,10 @@ from src.argdown_cotgen.strategies.argument_maps.depth_diffusion import (
 )
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 from src.argdown_cotgen.core.models import ArgumentMapStructure, DialecticalType
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 
 
-class TestDepthDiffusionStrategy(BaseStrategyTestSuite):
+class TestDepthDiffusionStrategy(BaseMapStrategyTestSuite):
     """Test suite for DepthDiffusionStrategy using the common framework."""
     
     @property

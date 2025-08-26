@@ -9,10 +9,10 @@ from typing import Type
 from src.argdown_cotgen.strategies.argument_maps.by_objection import ByObjectionStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
 from src.argdown_cotgen.core.parser import ArgdownParser
-from .strategy_test_framework import BaseStrategyTestSuite
+from .map_strategy_test_framework import BaseMapStrategyTestSuite
 
 
-class TestByObjectionStrategy(BaseStrategyTestSuite):
+class TestByObjectionStrategy(BaseMapStrategyTestSuite):
     """Test suite for ByObjectionStrategy using the common framework."""
     
     @property
@@ -205,7 +205,7 @@ class TestByObjectionSpecificBehavior:
     
     def test_handles_complex_structures(self):
         """Test that strategy handles complex argumentative structures."""
-        from .strategy_test_framework import COMMON_STRATEGY_TEST_CASES
+        from .map_strategy_test_framework import COMMON_STRATEGY_TEST_CASES
         
         # Test with the climate action case
         climate_case = None

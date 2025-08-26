@@ -255,7 +255,7 @@ Here the reconstruction process starts with a randomly distorted and heavily err
 
 #### Strategy `depth_diffusion`
 
-Here the reconstruction process starts with a flat and unstructured list of all arguments and propositions. All reasons are subsumed unter their correct parent node, increasing max depth incrementally.
+Here the reconstruction process starts with a flat, randomly shuffled, and unstructured list of all arguments and propositions. All reasons are subsumed unter their correct parent node, increasing max depth incrementally.
 
 Example:
 

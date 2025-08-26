@@ -20,25 +20,25 @@ Expected Output Steps:
       -> <Health Benefits>: Exercise improves health.  // Wrong relation
   [Time Constraints]: People lack time for exercise.  // Wrong node type and relation
   ```
-- v2: Fix first error (-> should be <+):
+- v2: Fix a first error (-> should be <+):
   ```
   Regular exercise is beneficial.
       <+ <Health Benefits>: Exercise improves health.
   [Time Constraints]: People lack time for exercise.
   ```
-- v3: Fix first error (add label):
+- v3: Fix a second error (add label):
   ```
   [Exercise]: Regular exercise is beneficial.
       <+ <Health Benefits>: Exercise improves health.
   [Time Constraints]: People lack time for exercise.
   ```
-- v4: Fix second error (place in correct position):
+- v4: Fix a third error (place in correct position):
   ```
   [Exercise]: Regular exercise is beneficial.
       <+ <Health Benefits>: Exercise improves health.
       <- [Time Constraints]: People lack time for exercise.
   ```
-- v5: Fix third error (make argument):
+- v5: Fix a fourth error (make argument):
   ```
   [Exercise]: Regular exercise is beneficial.
       <+ <Health Benefits>: Exercise improves health.
@@ -53,7 +53,6 @@ and progressively corrects them to demonstrate error-correction reasoning.
 
 import random
 import copy
-from typing import List, Tuple
 from abc import ABC, abstractmethod
 from ..base import BaseArgumentMapStrategy, AbortionMixin
 from ...core.models import ArgdownStructure, ArgumentMapLine, ArgumentMapStructure, CotStep, DialecticalType
@@ -63,7 +62,7 @@ class ErrorMechanism(ABC):
     """Abstract interface for error introduction mechanisms."""
     
     @abstractmethod
-    def introduce_error(self, structure: ArgumentMapStructure) -> Tuple[ArgumentMapStructure, str]:
+    def introduce_error(self, structure: ArgumentMapStructure) -> tuple[ArgumentMapStructure, str]:
         """Introduce one error into the structure."""
         pass
     
@@ -98,7 +97,7 @@ class DialecticalRelationError(ErrorMechanism):
         "// Correct? Check later."
     ]
 
-    def introduce_error(self, structure: ArgumentMapStructure) -> Tuple[ArgumentMapStructure, str]:
+    def introduce_error(self, structure: ArgumentMapStructure) -> tuple[ArgumentMapStructure, str]:
         """
         Introduce a dialectical relation error by changing a random relation to a different one.
         
@@ -185,7 +184,7 @@ class LabelError(ErrorMechanism):
         "// fix later"
     ]
 
-    def introduce_error(self, structure: ArgumentMapStructure) -> Tuple[ArgumentMapStructure, str]:
+    def introduce_error(self, structure: ArgumentMapStructure) -> tuple[ArgumentMapStructure, str]:
         """
         Introduce a label error by removing or corrupting labels.
         
@@ -253,7 +252,7 @@ class NodeTypeError(ErrorMechanism):
         "// wrong brackets?"
     ]
 
-    def introduce_error(self, structure: ArgumentMapStructure) -> Tuple[ArgumentMapStructure, str]:
+    def introduce_error(self, structure: ArgumentMapStructure) -> tuple[ArgumentMapStructure, str]:
         """
         Introduce a node type error by changing claim/argument formatting.
         
@@ -264,7 +263,7 @@ class NodeTypeError(ErrorMechanism):
         corrupted_structure = copy.deepcopy(structure)
         
         # Find all lines that have labels (since we need labels to change their type)
-        lines_with_labels: List[Tuple[int, ArgumentMapLine]] = []
+        lines_with_labels: list[tuple[int, ArgumentMapLine]] = []
         for i, line in enumerate(corrupted_structure.lines):
             if line.content.strip() and line.label:
                 lines_with_labels.append((i, line))
@@ -320,7 +319,7 @@ class PlacementError(ErrorMechanism):
         "// move this?"
     ]
 
-    def introduce_error(self, structure: ArgumentMapStructure) -> Tuple[ArgumentMapStructure, str]:
+    def introduce_error(self, structure: ArgumentMapStructure) -> tuple[ArgumentMapStructure, str]:
         """
         Introduce a placement error by moving a block to a different location.
         
@@ -386,7 +385,7 @@ class PlacementError(ErrorMechanism):
         
         return corrupted_structure, explanation
 
-    def _get_immediate_children(self, structure: ArgumentMapStructure, parent_index: int) -> List[int]:
+    def _get_immediate_children(self, structure: ArgumentMapStructure, parent_index: int) -> list[int]:
         """Get the indices of immediate children of the given node."""
         parent_line = structure.lines[parent_index]
         parent_indent = parent_line.indent_level
@@ -406,7 +405,7 @@ class PlacementError(ErrorMechanism):
         
         return children
 
-    def _get_all_descendants(self, structure: ArgumentMapStructure, node_index: int) -> List[int]:
+    def _get_all_descendants(self, structure: ArgumentMapStructure, node_index: int) -> list[int]:
         """Get all descendants of a node (recursive)."""
         descendants = []
         children = self._get_immediate_children(structure, node_index)
@@ -417,9 +416,9 @@ class PlacementError(ErrorMechanism):
         
         return descendants
 
-    def _find_valid_target_parents(self, structure: ArgumentMapStructure, block_root: int, block_nodes: List[int]) -> List[int | None]:
+    def _find_valid_target_parents(self, structure: ArgumentMapStructure, block_root: int, block_nodes: list[int]) -> list[int | None]:
         """Find valid parents where the block can be moved."""
-        valid_parents: List[int | None] = []
+        valid_parents: list[int | None] = []
         
         # Get current parent of the block
         current_parent = self._get_parent_index(structure, block_root)
@@ -464,7 +463,7 @@ class PlacementError(ErrorMechanism):
         
         return None
 
-    def _move_block_to_parent(self, structure: ArgumentMapStructure, block_nodes: List[int], new_parent_index: int | None) -> None:
+    def _move_block_to_parent(self, structure: ArgumentMapStructure, block_nodes: list[int], new_parent_index: int | None) -> None:
         """Move a block to be under a new parent."""
         # Extract the block lines
         block_lines = [structure.lines[i] for i in block_nodes]
@@ -523,7 +522,10 @@ class PlacementError(ErrorMechanism):
         # Insert the block at the new location
         for i, line in enumerate(block_lines):
             structure.lines.insert(insertion_point + i, line)
-    
+
+    def get_explanation(self, node_label: str) -> str:
+        return random.choice(self.PLACEMENT_ERROR_EXPLANATIONS).format(node_label=node_label)
+
 
 class SyntaxErrorMechanism(ErrorMechanism):
     """
@@ -548,7 +550,7 @@ class SyntaxErrorMechanism(ErrorMechanism):
         "// format unclear"
     ]
 
-    def introduce_error(self, structure: ArgumentMapStructure) -> Tuple[ArgumentMapStructure, str]:
+    def introduce_error(self, structure: ArgumentMapStructure) -> tuple[ArgumentMapStructure, str]:
         """
         Introduce a syntax error by corrupting formatting, indentation, or symbols.
         
@@ -571,56 +573,61 @@ class SyntaxErrorMechanism(ErrorMechanism):
         # Pick a random line with content
         line_index, selected_line = random.choice(lines_with_content)
         
-        # Choose one of three syntax error types randomly
-        error_type = random.choice([1, 2, 3])
-        
         node_label = selected_line.label if selected_line.label else "the line"
         
-        if error_type == 1:
-            # 1. Wrong indent (alter current indent by 1-3 spaces)
-            indent_change = random.choice([-3, -2, -1, 1, 2, 3])
-            new_indent = max(0, selected_line.indent_level + indent_change)
-            corrupted_structure.lines[line_index].indent_level = new_indent
-            
-        elif error_type == 2 and selected_line.label:
-            # 2. Wrong label syntax (only if line has a label)
-            # Choose between removing ":" or removing closing bracket
-            syntax_error = random.choice(["remove_colon", "remove_bracket"])
-            
-            if syntax_error == "remove_colon":
-                # Remove the colon from the content (find ": " and replace with " ")
-                content = selected_line.content
-                if ": " in content:
-                    corrupted_structure.lines[line_index].content = content.replace(": ", " ", 1)
-            
-            elif syntax_error == "remove_bracket":
-                # Remove closing bracket from label
-                label = selected_line.label
-                if label.endswith(">"):
-                    corrupted_structure.lines[line_index].label = label[:-1]  # Remove last ">"
-                elif label.endswith("]"):
-                    corrupted_structure.lines[line_index].label = label[:-1]  # Remove last "]"
+        # Try different error types until we successfully apply one
+        error_applied = False
         
-        elif error_type == 3 and selected_line.support_type is not None:
-            # 3. Illegal relation symbol (only if line has a relation)
-            # Replace with made-up illegal symbols
+        # Attempt 1: Wrong indent (most likely to succeed)
+        if not error_applied:
+            # Ensure we actually change the indent level
+            indent_changes = [-3, -2, -1, 1, 2, 3]
+            for indent_change in indent_changes:
+                new_indent = max(0, selected_line.indent_level + indent_change)
+                if new_indent != selected_line.indent_level:
+                    corrupted_structure.lines[line_index].indent_level = new_indent
+                    error_applied = True
+                    break
+        
+        # Attempt 2: Wrong label syntax (if line has a label and indent didn't change)
+        if not error_applied and selected_line.label:
+            # Try removing colon from content
+            content = selected_line.content
+            if ": " in content:
+                corrupted_structure.lines[line_index].content = content.replace(": ", " ", 1)
+                error_applied = True
+            elif selected_line.label.endswith((">", "]")):
+                # Try removing closing bracket from label
+                corrupted_structure.lines[line_index].label = selected_line.label[:-1]
+                error_applied = True
+        
+        # Attempt 3: Illegal relation symbol (if line has a relation)
+        if not error_applied and selected_line.support_type is not None:
             illegal_symbols = ["++", "--", "~>", "=>", "<", ">", ">>", "<<", "<~", "#", "*", "@"]
             illegal_symbol = random.choice(illegal_symbols)
             
-            # Create a fake DialecticalType for the illegal symbol
-            # We'll set support_type to None and modify content to include the illegal symbol
+            # Set support_type to None and modify content to include the illegal symbol
             corrupted_structure.lines[line_index].support_type = None
             
             # Prepend the illegal symbol to the content
             original_content = selected_line.content.strip()
             new_content = f"{illegal_symbol} {original_content}"
             corrupted_structure.lines[line_index].content = new_content
+            error_applied = True
         
-        else:
-            # Fallback: if chosen error type can't be applied, try indent error
-            indent_change = random.choice([-2, -1, 1, 2])
-            new_indent = max(0, selected_line.indent_level + indent_change)
-            corrupted_structure.lines[line_index].indent_level = new_indent
+        # Attempt 4: Force content change if nothing else worked
+        if not error_applied:
+            # Add extra whitespace or modify content directly
+            original_content = selected_line.content
+            
+            # Try adding extra spaces at the beginning
+            if not original_content.startswith("  "):
+                corrupted_structure.lines[line_index].content = "  " + original_content
+                error_applied = True
+            else:
+                # If already has leading spaces, add a syntax error marker
+                corrupted_structure.lines[line_index].content = original_content + " !"
+                error_applied = True
         
         # Add a note to the content with some probability (after applying the syntax error)
         if (random.random() < self.ADD_NOTE_PROBABILITY and 
@@ -667,18 +674,40 @@ class RandomDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
         "Last, I'll include the additional comments."
     ]
     
-    def __init__(self):
+    def __init__(self, mechanism_weights: dict[str, float] | None = None):
         super().__init__()
-
         self.error_mechanisms = [
             DialecticalRelationError(),
-            # Other error mechanisms would be added here
+            LabelError(),
+            NodeTypeError(), 
+            PlacementError(),
+            SyntaxErrorMechanism()
         ]
+        
+        # Default weights - can be customized via mechanism_weights parameter
+        default_weights = {
+            'DialecticalRelationError': 1.0,
+            'LabelError': 0.6,
+            'NodeTypeError': 0.6,
+            'PlacementError': 1.0,
+            'SyntaxErrorMechanism': 0.4
+        }
+        
+        # Allow customization of weights
+        self.mechanism_weights = mechanism_weights or default_weights
+        
+        # Validate weights
+        for mechanism in self.error_mechanisms:
+            mechanism_name = mechanism.__class__.__name__
+            if mechanism_name not in self.mechanism_weights:
+                self.mechanism_weights[mechanism_name] = 1.0  # Default weight
     
-    def generate(self, parsed_structure: ArgdownStructure, abortion_rate: float = 0.0) -> List[CotStep]:
+    def generate(self, parsed_structure: ArgdownStructure, abortion_rate: float = 0.0) -> list[CotStep]:
         """
         Generate CoT steps using random diffusion strategy.
-        
+
+        We work backwards from the correct final version, introducing errors progressively.
+                
         Args:
             parsed_structure: The parsed argument map structure
             abortion_rate: Probability of introducing abortion (0.0 to 1.0)
@@ -692,7 +721,7 @@ class RandomDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
         num_steps = self._sample_step_count(parsed_structure)
         
         current_map = copy.deepcopy(parsed_structure)
-        steps: List[CotStep] = []
+        steps: list[CotStep] = []
         
         for step_number in range(num_steps, 0, -1):
 
@@ -708,6 +737,10 @@ class RandomDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
 
                     if corrupted_map != current_map:
                         break
+                else:
+                    # Fallback: use a simple explanation and current map
+                    corrupted_map = current_map
+                    explanation = "Let me refine this structure."
 
             else:
 
@@ -715,14 +748,22 @@ class RandomDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
                 corrupted_map = current_map
                 explanation = random.choice(self.INITIAL_EXPLANATIONS)
 
-            # NOTE: Each step shows the state BEFORE applying the planned fix.
-            # So step v1 shows most corrupted state, v2 shows partially fixed, etc.
-            # More specifically:
-            #   In each iteration i (i=num_steps, num_steps-1, ...), we're generating a 
-            #   new corrupted_map (from previous current_map) with an additional err_i, 
-            #   and a plan `explanation` for fixing err_i.
-            #   So, a CotStep will consist in (explanation, current_map), i.e.: 
-            #   a plan for fixing err_i and the map where the error is fixed.
+            # NOTE: Step generation logic:
+            # We work backwards from the correct final version, introducing errors progressively.
+            # 
+            # Loop order: step_number goes from num_steps down to 1 (e.g., 5,4,3,2,1)
+            # - step_number=5: corrupted_map has 1 error, current_map is correct → creates step v5
+            # - step_number=4: corrupted_map has 2 errors, current_map has 1 error → creates step v4  
+            # - step_number=3: corrupted_map has 3 errors, current_map has 2 errors → creates step v3
+            # - step_number=2: corrupted_map has 4 errors, current_map has 3 errors → creates step v2
+            # - step_number=1: corrupted_map not used, current_map has 4 errors → creates step v1
+            #
+            # Each CotStep(explanation, content) contains:
+            # - explanation: Plan to fix the error that current_map contains
+            # - content: The current_map state (showing the error to be fixed)
+            #
+            # Result: v1 shows most errors, v2 shows fewer errors, ..., v5 shows fewest errors
+            # This creates the illusion of progressive error correction.
 
             content = self._format_map(current_map, include_yaml=False, include_comments=False)
             step = self._create_step(f"v{step_number}", content, explanation)
@@ -770,12 +811,28 @@ class RandomDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
     
     def _choose_error_mechanism(self) -> ErrorMechanism:
         """
-        Choose a random error introduction mechanism.
+        Choose a random error introduction mechanism based on configured weights.
         
         Returns:
             Selected error mechanism
-        """        
-        return random.choice(self.error_mechanisms)
+        """
+        # Create weighted list based on mechanism weights
+        mechanisms = []
+        weights = []
+        
+        for mechanism in self.error_mechanisms:
+            mechanism_name = mechanism.__class__.__name__
+            weight = self.mechanism_weights.get(mechanism_name, 1.0)
+            if weight > 0:  # Only include mechanisms with positive weights
+                mechanisms.append(mechanism)
+                weights.append(weight)
+        
+        if not mechanisms:
+            # Fallback to uniform selection if all weights are zero
+            return random.choice(self.error_mechanisms)
+        
+        # Use weighted random selection
+        return random.choices(mechanisms, weights=weights, k=1)[0]
         
     def _format_map(self, structure: ArgumentMapStructure, include_yaml: bool = False, include_comments: bool = False) -> str:
         """

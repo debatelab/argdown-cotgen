@@ -6,7 +6,18 @@ reasoning traces from Argdown snippets.
 from .parser import ArgdownParser
 from .models import SnippetType, CotResult
 from ..formatters.output import CotFormatter
+
+# Argument Map Strategies
 from ..strategies.argument_maps.by_rank import ByRankStrategy
+from ..strategies.argument_maps.breadth_first import BreadthFirstStrategy
+from ..strategies.argument_maps.depth_first import DepthFirstStrategy
+from ..strategies.argument_maps.by_objection import ByObjectionStrategy
+from ..strategies.argument_maps.random_diffusion import RandomDiffusionStrategy
+from ..strategies.argument_maps.depth_diffusion import DepthDiffusionStrategy
+
+# Argument Strategies
+from ..strategies.arguments.by_rank import ByRankStrategy as ArgumentByRankStrategy
+from ..strategies.arguments.by_feature import ByFeatureStrategy
 
 
 class CotGenerator:
@@ -78,9 +89,24 @@ class CotGenerator:
         if snippet_type == SnippetType.ARGUMENT_MAP:
             if self.pipe_type == "by_rank":
                 return ByRankStrategy()
+            elif self.pipe_type == "breadth_first":
+                return BreadthFirstStrategy()
+            elif self.pipe_type == "depth_first":
+                return DepthFirstStrategy()
+            elif self.pipe_type == "by_objection":
+                return ByObjectionStrategy()
+            elif self.pipe_type == "random_diffusion":
+                return RandomDiffusionStrategy()
+            elif self.pipe_type == "depth_diffusion":
+                return DepthDiffusionStrategy()
             else:
                 raise NotImplementedError(f"Strategy '{self.pipe_type}' not yet implemented for argument maps")
         elif snippet_type == SnippetType.ARGUMENT:
-            raise NotImplementedError("Argument strategies not yet implemented")
+            if self.pipe_type == "by_rank":
+                return ArgumentByRankStrategy()
+            elif self.pipe_type == "by_feature":
+                return ByFeatureStrategy()
+            else:
+                raise NotImplementedError(f"Strategy '{self.pipe_type}' not yet implemented for arguments")
         else:
             raise ValueError(f"Unknown snippet type: {snippet_type}")

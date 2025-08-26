@@ -58,31 +58,31 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
     TITLE_EXPLANATIONS = [
         "I'll start by identifying the title and gist of the argument.",
         "Let me begin with the argument's title and main claim.",
-        "First, I need to establish the argument's title and central thesis.",
+        "First, I will note the argument's title and gist.",
         "I'll start by setting up the argument's title and core statement.",
-        "Let me begin with the argument's heading and main proposition."
+        "Let me begin with the argument's heading and main thought."
     ]
     
     SCAFFOLD_EXPLANATIONS = [
         "Now I'll create a basic premise-conclusion scaffold with the final conclusion.",
-        "Let me set up the argument structure with the main conclusion.",
-        "I'll establish the basic argument framework with the final conclusion.",
+        "Let me set up the abstract argument pattern with the main conclusion.",
+        "I'll sketch the basic argument structure with the final conclusion.",
         "Now I'll create the argument scaffold showing the final conclusion.",
         "Let me build the premise-conclusion structure with the main conclusion."
     ]
     
     PREMISES_EXPLANATIONS = [
         "I'll add all the premise statements that provide the foundation for this argument.",
-        "Now I'll include all the basic premises that support the reasoning.",
-        "Let me add the foundational statements that the argument builds upon.",
+        "Now I'll include all the basic premises that ground the reasoning.",
+        "Let me add the premises that the argument builds upon.",
         "I'll include all the premise statements that form the argument's foundation.",
-        "Now I'll add the basic premises that provide the initial support."
+        "Now I'll add the premises of the argument."
     ]
     
     INTERMEDIATE_CONCLUSIONS_EXPLANATIONS = [
         "I'll add the intermediate conclusions that bridge premises to the final conclusion.",
         "Now I'll include the intermediate steps in the reasoning chain.",
-        "Let me add the conclusions derived from the premises that support the main conclusion.",
+        "Let me add the conclusions derived from the premises that further support the main conclusion.",
         "I'll include the intermediate reasoning steps that connect premises to the final conclusion.",
         "Now I'll add the derived conclusions that form the middle steps of the argument."
     ]
@@ -97,15 +97,15 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
     
     YAML_EXPLANATIONS = [
         "I'll add the YAML inline data that provides additional information.",
-        "Now I'll include the metadata and confidence values.",
-        "Let me add the YAML annotations with strength and certainty values.",
+        "Now I'll include the metadata and misc data.",
+        "Let me add the YAML annotations.",
         "I'll include the inline data that adds context to the statements.",
         "Now I'll add the YAML metadata that enriches the argument."
     ]
     
     COMMENT_EXPLANATIONS = [
         "Finally, I'll add the comments that provide additional context.",
-        "I'll include the explanatory comments to clarify the reasoning.",
+        "I'll include the explanatory comments or misc material to clarify the reasoning.",
         "Let me add the comments that provide helpful annotations.",
         "I'll include the contextual comments that explain the statements.",
         "Finally, I'll add the comments that offer additional insights."

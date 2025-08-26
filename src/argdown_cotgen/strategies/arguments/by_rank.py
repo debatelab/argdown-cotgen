@@ -51,7 +51,7 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
     TITLE_EXPLANATIONS = [
         "I'll start by identifying the title and gist of the argument.",
         "Let me begin with the argument's title and main claim.",
-        "First, I need to establish the argument's title and central thesis.",
+        "First, I shall to establish the argument's title and central thesis.",
         "I'll start by setting up the argument's title and core statement.",
         "Let me begin with the argument's heading and main proposition."
     ]
@@ -59,33 +59,33 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
     SCAFFOLD_EXPLANATIONS = [
         "Now I'll create a basic premise-conclusion scaffold with the final conclusion.",
         "Let me set up the argument structure with the main conclusion.",
-        "I'll establish the basic argument framework with the final conclusion.",
+        "I'll establish the final conclusion, leaving room for premises to be added later.",
         "Now I'll create the argument scaffold showing the final conclusion.",
-        "Let me build the premise-conclusion structure with the main conclusion."
+        "Let me outline a premise-conclusion structure including the main conclusion."
     ]
     
     MAIN_INFERENCE_EXPLANATIONS = [
         "I'll add the main inference step that leads to the final conclusion.",
         "Now I'll include the propositions that directly support the main conclusion.",
-        "Let me add the primary inference chain leading to the final conclusion.",
-        "I'll include the immediate premises and conclusion for the main inference.",
-        "Now I'll add the key propositions that directly infer the main conclusion."
+        "Let me add the primary sub argument leading to the final conclusion.",
+        "I'll include the premises and conclusion for the final inference step.",
+        "Now I'll add the propositions that directly entail the main conclusion."
     ]
     
     SUB_ARGUMENT_EXPLANATIONS = [
-        "I'll add the sub-argument for statement ({number}) to show how it's derived.",
+        "I'll add a sub-argument for statement ({number}), which show how it can be derived from other statements.",
         "Now I'll include the supporting reasoning for statement ({number}).",
-        "Let me add the inference chain that establishes statement ({number}).",
-        "I'll show how statement ({number}) is derived from its premises.",
-        "Now I'll add the sub-argument that justifies statement ({number})."
+        "Let me add the inference step that leads to statement ({number}).",
+        "I'll show how statement ({number}) is derived from additional premises.",
+        "Now I'll add another sub-argument that justifies statement ({number})."
     ]
     
     INFERENCE_EXPLANATIONS = [
-        "I'll add the inference rules that show the logical connections.",
+        "I'll add inference information that explicates the logical connections.",
         "Now I'll include the inference information to clarify the reasoning steps.",
         "Let me add the logical rules that govern these inferences.",
-        "I'll include the inference annotations to show the reasoning structure.",
-        "Now I'll add the inference rules that connect premises to conclusions."
+        "I'll include the inference annotations to show how the reasoning steps work.",
+        "Now I'll add inference rules used to derive conclusions from the corresponding premises."
     ]
     
     YAML_EXPLANATIONS = [
@@ -98,8 +98,8 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
     
     COMMENT_EXPLANATIONS = [
         "Finally, I'll add the comments that provide additional context.",
-        "I'll include the explanatory comments to clarify the reasoning.",
-        "Let me add the comments that provide helpful annotations.",
+        "I'll include the explanatory comments to put the argument in context.",
+        "Let me add the comments and misc content that provides helpful annotations.",
         "I'll include the contextual comments that explain the statements.",
         "Finally, I'll add the comments that offer additional insights."
     ]

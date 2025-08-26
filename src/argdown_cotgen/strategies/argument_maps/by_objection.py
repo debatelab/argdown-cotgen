@@ -105,10 +105,10 @@ class ByObjectionStrategy(AbortionMixin, BaseArgumentMapStrategy):
         "Now I'll build the main supporting case.",
         "Let me add the primary argumentation.",
         "I'll establish the main argumentative support.",
-        "How are the main claims supported? Let me sketch the central line of argumentation.",
+        "How is the main claim supported? Let me sketch the central line of argumentation.",
         "Now I'll outline the core supporting arguments.",
-        "Let me add the main arguments supporting the root claim(s)."
-        "What are the main arguments in favour of the key claims? Let me show them.",
+        "Let me add the main arguments supporting the root claim."
+        "What are the main arguments in favour of the key claim? Let me show them.",
     ]
     
     OBJECTION_EXPLANATIONS = [

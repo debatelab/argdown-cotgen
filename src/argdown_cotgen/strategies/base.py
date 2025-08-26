@@ -3,9 +3,9 @@ Base strategy interface for generating Chain-of-Thought reasoning traces.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 import random
-from ..core.models import ArgdownStructure, CotStep, ArgumentStructure, ArgumentMapStructure, ArgumentMapLine, INDENT_SIZE
+from ..core.models import ArgdownStructure, CotStep, ArgumentStructure, ArgumentMapStructure, ArgumentMapLine, ArgumentStatementLine, INDENT_SIZE
 
 
 class AbortionMixin:
@@ -242,4 +242,188 @@ class BaseArgumentMapStrategy(BaseStrategy):
             content += f" // {line.comment_content}"
         
         return f"{indent}{relation_part}{content}"
+
+
+class BaseArgumentStrategy(BaseStrategy):
+    """
+    Abstract base class for all CoT argument generation strategies.
+    """
+
+    def _format_statement_line(self, line: ArgumentStatementLine, include_yaml: bool = False, 
+                              include_comments: bool = False) -> str:
+        """
+        Convert an ArgumentStatementLine back to proper Argdown syntax.
+        
+        Args:
+            line: The ArgumentStatementLine to format
+            include_yaml: Whether to include YAML inline data
+            include_comments: Whether to include comments
+            
+        Returns:
+            Formatted Argdown line as string
+        """
+        # Handle standalone comments (empty content but has comment)
+        if not line.content.strip() and include_comments and line.has_comment:
+            return f"// {line.comment_content}"
+        
+        # Skip empty lines
+        if not line.content.strip():
+            return ""
+        
+        # Handle different line types
+        content = line.content.strip()
+        
+        # Handle inference rules (like "-- modus ponens --")
+        if line.is_inference_rule:
+            return content
+        
+        # Handle separators (like "-----")
+        if line.is_separator:
+            return content
+        
+        # Handle preamble (title and gist)
+        if line.is_preamble:
+            formatted_content = content
+            # Add YAML inline data if requested and present
+            if include_yaml and line.yaml_inline_data:
+                formatted_content = formatted_content.rstrip() + f" {line.yaml_inline_data}"
+            # Add comment if requested and present
+            if include_comments and line.has_comment:
+                formatted_content += f" // {line.comment_content}"
+            return formatted_content
+        
+        # Handle numbered statements - content already includes the number
+        # so we don't need to add it again
+        formatted_content = content
+        
+        # Add YAML inline data if requested and present
+        if include_yaml and line.yaml_inline_data:
+            formatted_content = formatted_content.rstrip() + f" {line.yaml_inline_data}"
+        
+        # Add comment if requested and present
+        if include_comments and line.has_comment:
+            formatted_content += f" // {line.comment_content}"
+        
+        return formatted_content
+    
+    def _get_premises(self, structure: ArgumentStructure) -> List[ArgumentStatementLine]:
+        """Get all premise statements from the argument structure."""
+        return structure.premises
+    
+    def _get_conclusions(self, structure: ArgumentStructure) -> List[ArgumentStatementLine]:
+        """Get all conclusion statements from the argument structure."""
+        return structure.conclusions
+    
+    def _get_inference_rules(self, structure: ArgumentStructure) -> List[ArgumentStatementLine]:
+        """Get all inference rule lines from the argument structure."""
+        return [line for line in structure.lines if line.is_inference_rule]
+    
+    def _get_numbered_statements(self, structure: ArgumentStructure) -> List[ArgumentStatementLine]:
+        """Get all numbered statements from the argument structure."""
+        return structure.numbered_statements
+    
+    def _get_preamble_lines(self, structure: ArgumentStructure) -> List[ArgumentStatementLine]:
+        """Get all preamble lines (title and gist) from the argument structure."""
+        return [line for line in structure.lines if line.is_preamble]
+    
+    def _build_inference_step(self, premises: List[ArgumentStatementLine], 
+                             conclusion: ArgumentStatementLine,
+                             inference_rule: Optional[ArgumentStatementLine] = None,
+                             include_yaml: bool = False,
+                             include_comments: bool = False) -> str:
+        """
+        Build a complete inference step with premises, rule, and conclusion.
+        
+        Args:
+            premises: List of premise statements
+            conclusion: The conclusion statement
+            inference_rule: Optional inference rule line
+            include_yaml: Whether to include YAML inline data
+            include_comments: Whether to include comments
+            
+        Returns:
+            Formatted inference step as string
+        """
+        lines = []
+        
+        # Add premises
+        for premise in premises:
+            lines.append(self._format_statement_line(premise, include_yaml, include_comments))
+        
+        # Add inference rule if present
+        if inference_rule:
+            lines.append(self._format_statement_line(inference_rule, include_yaml, include_comments))
+        
+        # Add conclusion
+        lines.append(self._format_statement_line(conclusion, include_yaml, include_comments))
+        
+        return '\n'.join(line for line in lines if line.strip())
+    
+    def _create_premise_conclusion_scaffold(self, structure: ArgumentStructure,
+                                          main_conclusion: Optional[ArgumentStatementLine] = None) -> str:
+        """
+        Create a basic premise-conclusion scaffold structure.
+        
+        Args:
+            structure: The argument structure
+            main_conclusion: Optional specific conclusion to highlight
+            
+        Returns:
+            Scaffold structure as string
+        """
+        lines = []
+        
+        # Add preamble if present
+        preamble_lines = self._get_preamble_lines(structure)
+        for line in preamble_lines:
+            lines.append(self._format_statement_line(line))
+        
+        if preamble_lines:
+            lines.append("")  # Empty line after preamble
+        
+        # Add placeholder for premises
+        lines.append("(1) // ... premises to be added here")
+        
+        # Add separator
+        lines.append("-----")
+        
+        # Add main conclusion or placeholder
+        if main_conclusion:
+            # Renumber the conclusion to (2) for consecutive numbering
+            # Extract the content without the original statement number
+            import re
+            content_match = re.match(r'^\(\d+\)\s*(.*)$', main_conclusion.content.strip())
+            if content_match:
+                conclusion_text = content_match.group(1)
+                lines.append(f"(2) {conclusion_text}")
+            else:
+                # Fallback if the content doesn't match expected format
+                lines.append(f"(2) {main_conclusion.content.strip()}")
+        else:
+            lines.append("(2) // ... main conclusion to be added here")
+        
+        return '\n'.join(lines)
+    
+    def _format_argument_complete(self, structure: ArgumentStructure,
+                                 include_yaml: bool = True,
+                                 include_comments: bool = True) -> str:
+        """
+        Format the complete argument structure.
+        
+        Args:
+            structure: The argument structure to format
+            include_yaml: Whether to include YAML inline data
+            include_comments: Whether to include comments
+            
+        Returns:
+            Complete formatted argument as string
+        """
+        lines = []
+        
+        for line in structure.non_empty_lines:
+            formatted_line = self._format_statement_line(line, include_yaml, include_comments)
+            if formatted_line.strip():
+                lines.append(formatted_line)
+        
+        return '\n'.join(lines)
     

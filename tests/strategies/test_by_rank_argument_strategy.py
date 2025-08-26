@@ -10,6 +10,7 @@ from typing import Type
 from .argument_strategy_test_framework import BaseArgumentStrategyTestSuite
 from src.argdown_cotgen.strategies.arguments.by_rank import ByRankStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentStrategy
+from src.argdown_cotgen.core.models import ArgumentStructure
 
 
 class TestByRankArgumentStrategy(BaseArgumentStrategyTestSuite):
@@ -153,3 +154,105 @@ class TestByRankArgumentStrategy(BaseArgumentStrategyTestSuite):
         # Should have the inference rule
         rule_lines = [line for line in content_lines if "rule1" in line and "--" in line]
         assert len(rule_lines) > 0, "Sub-argument should include the inference rule"
+
+    def test_intermediate_conclusion_notes(self):
+        """Test that intermediate conclusions get annotated with notes in the main inference step."""
+        argdown_text = """<Note Test>: Test intermediate conclusion notes.
+
+(1) Basic premise one.
+(2) Basic premise two.
+-- from (1) and (2) --
+(3) Intermediate conclusion.
+(4) Another basic premise.
+-- from (3) and (4) --
+(5) Final conclusion."""
+        
+        structure = self.parser.parse(argdown_text)
+        steps = self.strategy.generate(structure, abortion_rate=0.0)
+        
+        # Find the main inference step (v3)
+        main_inference_step = None
+        for step in steps:
+            if step.version == "v3":
+                main_inference_step = step
+                break
+        
+        assert main_inference_step is not None, "Should find v3 main inference step"
+        
+        # The main inference step should include premises that directly support the final conclusion
+        # In this case, statement 3 (intermediate conclusion) and statement 4 should be the direct premises
+        content = main_inference_step.content
+        
+        # Check that statement 3 (the intermediate conclusion) gets a note
+        lines = content.split('\n')
+        statement_3_line = None
+        for line in lines:
+            # Look for the line containing "Intermediate conclusion" (content of statement 3)
+            if "Intermediate conclusion" in line and line.strip().startswith('('):
+                statement_3_line = line
+                break
+        
+        assert statement_3_line is not None, "Should find the intermediate conclusion in main inference step"
+        
+        # Check that it has a note (// comment)
+        assert "//" in statement_3_line, "Intermediate conclusion should have a note comment"
+        
+        # Verify the note contains one of the expected phrases
+        expected_note_phrases = [
+            "not sure here",
+            "need to revisit this", 
+            "might be an intermediate conclusion",
+            "revisit later and add supporting premises if required",
+            "🤔 Is this a conclusion?"
+        ]
+        
+        note_found = any(phrase in statement_3_line for phrase in expected_note_phrases)
+        assert note_found, f"Note should contain one of the expected phrases. Line: {statement_3_line}"
+        
+        # Also verify that basic premises (like statement 4) don't get notes
+        statement_4_line = None
+        for line in lines:
+            if "Another basic premise" in line and line.strip().startswith('('):
+                statement_4_line = line
+                break
+        
+        if statement_4_line:
+            # If statement 4 appears in this step, it should NOT have a note
+            # (unless it's also an intermediate conclusion, which it's not in this test)
+            assert "//" not in statement_4_line, "Basic premises should not have notes"
+
+    def test_intermediate_conclusion_detection_method(self):
+        """Test the _is_intermediate_conclusion method directly."""
+        argdown_text = """<Detection Test>: Test intermediate conclusion detection.
+
+(1) First premise.
+(2) Second premise.
+-- inference --
+(3) Intermediate conclusion.
+(4) Third premise.
+-- final inference --
+(5) Final conclusion."""
+        
+        structure = self.parser.parse(argdown_text)
+        assert isinstance(structure, ArgumentStructure), "Should be ArgumentStructure for this test"
+        arg_structure = structure  # Type is now narrowed to ArgumentStructure
+        
+        # Cast strategy to the correct type to access the specific method
+        rank_strategy = self.strategy
+        assert isinstance(rank_strategy, ByRankStrategy), "Strategy should be ByRankStrategy"
+        
+        # Get all numbered statements
+        numbered_statements = rank_strategy._get_numbered_statements(arg_structure)
+        statements_by_number = {stmt.statement_number: stmt for stmt in numbered_statements}
+        
+        # Test each statement
+        assert not rank_strategy._is_intermediate_conclusion(arg_structure, statements_by_number[1]), \
+            "Statement 1 should not be intermediate conclusion (it's a premise)"
+        assert not rank_strategy._is_intermediate_conclusion(arg_structure, statements_by_number[2]), \
+            "Statement 2 should not be intermediate conclusion (it's a premise)"
+        assert rank_strategy._is_intermediate_conclusion(arg_structure, statements_by_number[3]), \
+            "Statement 3 should be intermediate conclusion (derived by inference, not final)"
+        assert not rank_strategy._is_intermediate_conclusion(arg_structure, statements_by_number[4]), \
+            "Statement 4 should not be intermediate conclusion (it's a premise)"
+        assert not rank_strategy._is_intermediate_conclusion(arg_structure, statements_by_number[5]), \
+            "Statement 5 should not be intermediate conclusion (it's the final conclusion)"

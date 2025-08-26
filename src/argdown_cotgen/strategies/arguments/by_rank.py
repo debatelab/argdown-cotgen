@@ -103,6 +103,16 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         "I'll include the contextual comments that explain the statements.",
         "Finally, I'll add the comments that offer additional insights."
     ]
+
+    NOTES_INTERMEDIATE_CONCLUSION = [
+        "not sure here",
+        "need to revisit this",
+        "might be an intermediate conclusion",
+        "revisit later and add supporting premises if required",
+        "🤔 Is this a conclusion?"
+    ]
+
+
     """
     Rank-based strategy for reconstructing individual arguments.
     """
@@ -205,6 +215,10 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         # Add main premises with consecutive numbering starting from 1
         for i, premise in enumerate(main_premises, 1):
             content = self._extract_statement_content(premise)
+            # if premise is in fact an intermediate conclusion, add a note
+            if self._is_intermediate_conclusion(structure, premise):
+                note = self._get_random_explanation(self.NOTES_INTERMEDIATE_CONCLUSION)
+                content += f" // {note}"
             lines.append(f"({i}) {content}")
         
         # Add separator
@@ -449,3 +463,56 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
             if premise.statement_number == statement.statement_number:
                 return i
         return statement.statement_number  # fallback to original number
+    
+    def _is_intermediate_conclusion(self, structure: ArgumentStructure, statement):
+        """
+        Check if a statement is an intermediate conclusion.
+        
+        A statement is an intermediate conclusion if:
+        1. It is derived by an inference rule (first statement after an inference line)
+        2. It is not the final conclusion
+        """
+        if not statement or not statement.statement_number:
+            return False
+            
+        # Check if it's the final conclusion
+        final_conclusion = structure.final_conclusion
+        if final_conclusion and statement.statement_number == final_conclusion.statement_number:
+            return False
+            
+        # Check if it's derived by an inference rule
+        return self._is_derived_by_inference(structure, statement)
+    
+    def _is_derived_by_inference(self, structure: ArgumentStructure, statement):
+        """
+        Check if a statement is derived by an inference rule.
+        
+        A statement is derived if it's the first statement to appear after an inference line.
+        """
+        if not statement.line_number:
+            return False
+            
+        inference_rules = self._get_inference_rules(structure)
+        numbered_statements = self._get_numbered_statements(structure)
+        
+        for rule in inference_rules:
+            if not rule.line_number:
+                continue
+                
+            # Find the first statement line that appears after this inference rule
+            first_statement_after_rule = None
+            min_line_number = float('inf')
+            
+            for stmt in numbered_statements:
+                if (stmt.line_number and 
+                    stmt.line_number > rule.line_number and
+                    stmt.line_number < min_line_number):
+                    first_statement_after_rule = stmt
+                    min_line_number = stmt.line_number
+            
+            # If this statement is the first after this rule, it's derived
+            if (first_statement_after_rule and 
+                first_statement_after_rule.statement_number == statement.statement_number):
+                return True
+        
+        return False

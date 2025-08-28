@@ -253,6 +253,35 @@ ARGUMENT_SNIPPETS = [
             "has_title": True
         }
     ),
+    SnippetTestCase(
+        name="multi_step_argument_multi_line_inference",
+        snippet="""
+(1) Initial premise.
+(2) Second premise.
+--
+modus ponens
+--
+(3) Intermediate conclusion.
+(4) Additional premise.
+(5) Another premise.
+--
+disjunctive syllogism
+--
+(6) Another intermediate conclusion.
+(7) Final premise.
+--
+modus tollens
+--
+(8) Final conclusion.
+""",
+        expected_type=SnippetType.ARGUMENT,
+        description="Multi-step argument with multiple inference rules",
+        expected_properties={
+            "numbered_statements": 8,
+            "inference_rules": 9,  # 3 multi-line inference rule blocks, 3 lines each
+            "has_title": False
+        }
+    ),
 ]
 
 # Edge cases and special scenarios
@@ -280,14 +309,14 @@ EDGE_CASE_SNIPPETS = [
         snippet="""
 [Main]: Main claim.
   <+ <Arg1>: Argument 1 (2 spaces).
-      <+ <Arg2>: Argument 2 (6 spaces).
+     <+ <Arg2>: Argument 2 (6 spaces).
     <- <Obj>: Objection (4 spaces).
 """,
         expected_type=SnippetType.ARGUMENT_MAP,
         description="Mixed indentation levels",
         expected_properties={
             "handles_mixed_indentation": True,
-            "max_depth": 1
+            "max_depth": 2
         }
     ),
     

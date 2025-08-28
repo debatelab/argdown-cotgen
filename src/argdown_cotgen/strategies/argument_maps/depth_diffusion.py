@@ -103,7 +103,7 @@ import random
 from typing import List, Dict, Set, Optional, Any
 from dataclasses import dataclass
 
-from src.argdown_cotgen.core.models import ArgdownStructure, ArgumentMapStructure, CotStep, INDENT_SIZE
+from src.argdown_cotgen.core.models import ArgdownStructure, ArgumentMapStructure, CotStep
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy, AbortionMixin
 
 
@@ -454,7 +454,6 @@ class DepthDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
         """Build content with correct placement up to max_depth and placeholders for deeper nodes."""
         lines = []
         siblings_at_max_depth = []  # Track siblings to shuffle
-        current_parent_signature = None
         
         for i, line in enumerate(structure.lines):
             # Skip empty lines
@@ -465,42 +464,28 @@ class DepthDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
             if i in included_nodes and line.indent_level <= max_depth:
                 formatted_line = self._format_line(line, include_yaml=False, include_comments=False)
                 if formatted_line.strip():
-                    # Check if this line is at max_depth and should be shuffled
-                    if line.indent_level == max_depth:
-                        parent_sig = self._get_parent_signature(lines)
-                        if parent_sig != current_parent_signature:
-                            # New parent - shuffle and add previous siblings
-                            if siblings_at_max_depth:
-                                random.shuffle(siblings_at_max_depth)
-                                lines.extend(siblings_at_max_depth)
-                                siblings_at_max_depth = []
-                            current_parent_signature = parent_sig
+                    # Check if this line is at max depth and should be potentially shuffled before being appended
+                    if line.indent_level == max_depth and line.indent_level > 0:
                         siblings_at_max_depth.append(formatted_line)
                     else:
-                        # Not at max_depth - add directly and flush any pending siblings
+                        # flush and add siblings at max depth
                         if siblings_at_max_depth:
                             random.shuffle(siblings_at_max_depth)
                             lines.extend(siblings_at_max_depth)
                             siblings_at_max_depth = []
+                        # add line
                         lines.append(formatted_line)
             
             # Add placeholder entries for nodes that exist at deeper levels
             elif line.content.strip() and line.indent_level > max_depth:
-                # Check if this node has a parent that's already placed
-                parent_placed = self._has_placed_parent(structure, i, included_nodes, max_depth)
-                if parent_placed:
-                    # Create placeholder entry at the deepest placed level
-                    placeholder_line = self._create_placeholder_line(structure, i, max_depth)
-                    if placeholder_line and placeholder_line not in lines:
-                        # Placeholders are always at max_depth + 1, but treat as max_depth for shuffling
-                        parent_sig = self._get_parent_signature(lines)
-                        if parent_sig != current_parent_signature:
-                            if siblings_at_max_depth:
-                                random.shuffle(siblings_at_max_depth)
-                                lines.extend(siblings_at_max_depth)
-                                siblings_at_max_depth = []
-                            current_parent_signature = parent_sig
-                        siblings_at_max_depth.append(placeholder_line)
+                # # Check if this node has a parent that's already placed
+                # parent_placed = self._has_placed_parent(structure, i, included_nodes, max_depth)
+                # if parent_placed:
+                # Create placeholder entry at the deepest placed level
+                placeholder_line = self._create_placeholder_line(structure, i, max_depth)
+                if placeholder_line and placeholder_line not in lines:
+                    # Placeholders appear always at max_depth and will be shuffled
+                    siblings_at_max_depth.append(placeholder_line)
         
         # Flush any remaining siblings
         if siblings_at_max_depth:
@@ -543,9 +528,9 @@ class DepthDiffusionStrategy(AbortionMixin, BaseArgumentMapStrategy):
         """Create a placeholder line for a node that's not yet properly placed."""
         current_line = structure.lines[node_index]
         
-        # Find the appropriate indentation level (at max_depth + 1)
-        placeholder_indent = min(max_depth + 1, current_line.indent_level)
-        indent = " " * (placeholder_indent * INDENT_SIZE)
+        # Find the appropriate indentation level (at max_depth)
+        placeholder_indent = min(max_depth, current_line.indent_level)
+        indent = " " * (placeholder_indent * current_line.indent_size)
         
         # Extract just the content without labels or relations
         content = current_line.content.strip()

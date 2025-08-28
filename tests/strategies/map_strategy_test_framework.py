@@ -65,12 +65,13 @@ The framework includes comprehensive validation:
 - YAML handling: Validates proper spacing and reconstruction of inline data
 - Comment preservation: Ensures comments are properly handled
 - Progressive content: Validates content grows correctly across steps
-- Version numbering: Ensures proper step versioning (v1, v2, etc.)
+- Version numbering: Ensures proper step versioning (v1, v2, etc.) and that first step is always v1
 
 For complete documentation, examples, and troubleshooting, see:
 docs/STRATEGY_TESTING_FRAMEWORK.md
 """
 
+from pprint import pprint
 import pytest
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Type
@@ -87,7 +88,7 @@ class StrategyTestCase:
     name: str
     argdown_text: str
     description: str
-    expected_step_count: int
+    expected_step_count: int | Dict[str, int]
     expected_features: Dict[str, Any]
     abortion_rate: float = 0.0
 
@@ -187,7 +188,61 @@ COMMON_STRATEGY_TEST_CASES = [
             "has_deep_nesting": True
         }
     ),
-    
+
+    StrategyTestCase(
+        name="ai_cyber_4_level",
+        argdown_text="""[AI for Humane Warfare]: This house believes that countries have a moral obligation to prioritize the development and deployment of AI and programming in warfare to minimize human casualties and ensure more precise and accountable military operations.
+    <+ <Cyber Shield>: Prioritizing AI development in warfare enables the creation of advanced cyber defense systems, protecting against cyber threats and preventing devastating attacks on critical infrastructure, which is essential for national security and human safety.
+        <+ <Critical Backbone>: Critical infrastructure serves as the backbone of a nation's economy, transportation, and healthcare systems, making its protection essential for maintaining national stability and public well-being.
+            <+ <Economic Backbone>: The integrity of a nation's critical infrastructure is directly linked to its ability to maintain law and order, without which national stability would be severely compromised.
+                <- <Digital Fortification>: Advanced cybersecurity measures, such as blockchain-based encryption and AI-powered threat detection, can effectively protect critical infrastructure from cyber attacks, thereby minimizing the risk of compromise to national stability.
+            <- <Vulnerability to Exploitation>: Critical infrastructure can be exploited by authoritarian regimes, like North Korea, to control and manipulate public opinion, ultimately harming public well-being.
+        <+ <Vulnerable Foundations>: The destruction of critical infrastructure can have a ripple effect, causing widespread disruptions to essential services, economic losses, and even loss of life, thereby compromising national security and human safety.
+            <+ <Security Domino Effect:>: The destruction of critical infrastructure can trigger a chain reaction of failures, allowing malicious actors to exploit vulnerabilities and further compromise national security and human safety.
+                <+ <Foundation of Trust>: The reliability and security of critical infrastructure form the foundation of public trust in government and institutions, which is essential for maintaining social order and national stability.
+            <+ <Societal Stability>: Prioritizing national security and human safety is essential for maintaining public trust, preventing social unrest, and ensuring the continuity of essential services and economic activities.
+                <+ <Economic Stability Argument>: Preventing social unrest is crucial because it helps to maintain economic stability, which is vital for attracting investments, creating jobs, and ensuring the continuity of essential services, all of which are essential for national security and human safety.
+            <- <Overprotection Paradox>: Prioritizing the protection of critical infrastructure can lead to an over-reliance on security measures, creating new vulnerabilities and risks that ultimately compromise national security and human safety.
+        <+ <Intelligent Incident Response>: AI-powered systems can analyze vast amounts of data in real-time, allowing for swift and effective incident response to cyber attacks, which is crucial for protecting critical infrastructure.
+        <- <Creating New Vulnerabilities>: The integration of AI in warfare can introduce new vulnerabilities in critical infrastructure, such as the potential for AI systems to be compromised or manipulated by adversaries, which can lead to even more devastating attacks.
+            <+ <Autonomous Attack Vectors>: Manipulated AI systems can create novel, unforeseen attack vectors that human defenders are unprepared to counter, increasing the likelihood of devastating attacks on critical infrastructure.
+            <- <Blockchain Shield>: The integration of blockchain technology in AI systems can provide a secure and transparent framework for data management, making it extremely difficult for adversaries to compromise or manipulate the system.
+        <- <Overlooking Human Error>: The use of AI in warfare can actually increase the risk of cyber attacks on critical infrastructure if the AI system is not properly designed or configured, or if human operators make mistakes in its deployment or maintenance.""",
+        description="Complex 4-level ai cyber argument map",
+        expected_step_count={
+            "ByRankStrategy": 5,
+            "BreadthFirstStrategy": 9, 
+            "DepthFirstStrategy": 9, 
+            "ByObjectionStrategy": 4,
+        },  # Will vary by strategy
+        expected_features={
+            "max_depth": 4,
+            "has_support": True,
+            "has_attack": True,
+            "has_deep_nesting": True
+        }
+    ),
+
+    # Examples from breadth_first_examples.md
+    StrategyTestCase(
+        name="climate_action_3_level_indent2",
+        argdown_text="""[Climate Action]: We should act on climate change.
+  <+ <Scientific Evidence>: Science supports climate action.
+    <+ <IPCC Reports>: International scientific consensus.
+    <+ <Temperature Data>: Rising global temperatures.
+  <- <Economic Costs>: Action is too expensive.
+    <- <Long-term Benefits>: Benefits outweigh costs.
+      <+ <Health Savings>: Reduced healthcare costs.""",
+        description="Complex 3-level climate action argument map",
+        expected_step_count=5,  # Will vary by strategy
+        expected_features={
+            "max_depth": 3,
+            "has_support": True,
+            "has_attack": True,
+            "has_deep_nesting": True
+        }
+    ),
+
     StrategyTestCase(
         name="multiple_root_policies",
         argdown_text="""[Policy A]: We should implement policy A.
@@ -461,13 +516,22 @@ class BaseMapStrategyTestSuite(ABC):
         
         Default implementation allows some flexibility around expected count.
         """
-        expected = test_case.expected_step_count
+        strategy_name = self.strategy_class.__name__
         actual = len(steps)
-        
-        # Allow some flexibility (±1) as different strategies may vary slightly
-        assert expected - 1 <= actual <= expected + 2, \
-            f"Expected ~{expected} steps for {test_case.name}, got {actual}"
+        pprint(steps)
     
+        if isinstance(test_case.expected_step_count, int):
+            expected = test_case.expected_step_count        
+            # Allow some flexibility (±1) as different strategies may vary slightly
+            assert expected - 1 <= actual <= expected + 2, \
+                f"Expected ~{expected} steps for {test_case.name}, got {actual}"
+        elif isinstance(test_case.expected_step_count, Dict):
+            if strategy_name in test_case.expected_step_count:
+                expected = test_case.expected_step_count[strategy_name]
+                assert expected == actual
+
+
+
     def _validate_features(self, steps: List[CotStep], structure: ArgumentMapStructure, 
                           expected: Dict[str, Any]):
         """Validate that expected features are present in the generated steps."""
@@ -488,6 +552,9 @@ class BaseMapStrategyTestSuite(ABC):
     def _validate_step_quality(self, steps: List[CotStep]):
         """Validate general quality of generated steps."""
         assert len(steps) >= 1, "Should generate at least one step"
+        
+        # Check that first step is always v1
+        assert steps[0].version == "v1", f"First step should always be v1, got {steps[0].version}"
         
         # Check version numbering
         for i, step in enumerate(steps):

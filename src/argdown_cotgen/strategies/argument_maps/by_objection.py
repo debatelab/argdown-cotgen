@@ -115,7 +115,7 @@ class ByObjectionStrategy(AbortionMixin, BaseArgumentMapStrategy):
         "Now let me add objections against the arguments and claims sketched so far.",
         "I shall next add objections and their respective supporting arguments.",
         "Are there any objections challenging the key claims directly or indirectly?",
-        "Now I'll present further critical arguments opposing the kley claims.",
+        "Now I'll present further critical arguments opposing the key claims.",
         "Let me consider and add objections."
     ]
     
@@ -344,14 +344,15 @@ class ByObjectionStrategy(AbortionMixin, BaseArgumentMapStrategy):
     
     def _get_next_primary_objection_group(self, structure: ArgumentMapStructure, revealed_nodes: set) -> List[int]:
         """
-        Get the next primary objection group (all primary objection-like relations against the same revealed node) with supporting evidence.
+        Get the next primary objection group (all primary objection-like relations against the same revealed nodes) with supporting evidence.
         
         A primary objection group consists of all primary objection-like arguments (attacks, undercuts, contradictory) 
-        against the same revealed node, along with their supporting descendants.
+        against the same revealed nodes, along with their supporting descendants.
         """
-        # Look for the first revealed node that has unrevealed primary objection-like children
+        objections: list[int] = []
+
+        # Look at each revealed node that has unrevealed primary objection-like children
         for revealed_node in revealed_nodes:
-            objection_group = []
             children = self._get_immediate_children(structure, revealed_node)
             
             # Collect ALL primary objection-like children of this revealed node
@@ -360,16 +361,15 @@ class ByObjectionStrategy(AbortionMixin, BaseArgumentMapStrategy):
                     line = structure.lines[child]
                     if line.support_type and self._is_primary_objection(line.support_type):
                         # Add this objection and its supporting evidence
-                        objection_group.append(child)
+                        objections.append(child)
                         # Add supporting evidence for this objection
                         support_chain = self._get_primary_support_descendants(structure, child, revealed_nodes)
-                        objection_group.extend(support_chain)
+                        objections.extend(support_chain)
             
-            # If we found objections against this revealed node, return ALL of them
-            if objection_group:
-                return objection_group
+        # Delete duplicates
+        objections = list(set(objections))
         
-        return []
+        return objections
     
     def _get_unrevealed_nodes(self, structure: ArgumentMapStructure, revealed_nodes: set) -> List[int]:
         """Get all nodes that haven't been revealed yet."""

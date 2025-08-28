@@ -1,8 +1,11 @@
 """Test that INDENT_SIZE constant is used consistently."""
 
+from pprint import pprint
 from src.argdown_cotgen.core.models import INDENT_SIZE
 from src.argdown_cotgen.core.parser import ArgdownParser
 from src.argdown_cotgen.strategies.argument_maps.by_rank import ByRankStrategy
+
+# NOTE: This is slightly outdated as we're calculating indent_size for each snippet.
 
 
 class TestIndentSizeConstant:
@@ -36,8 +39,8 @@ class TestIndentSizeConstant:
         strategy = ByRankStrategy()
         
         # Test with multi-level structure
-        argdown_text = """# Main claim
-    ## Sub-claim
+        argdown_text = """Main claim
+    <- Sub-claim
         +> Evidence"""
         
         structure = parser.parse(argdown_text)
@@ -46,7 +49,9 @@ class TestIndentSizeConstant:
         # Check that final step has proper indentation
         final_step = steps[-1]
         lines = final_step.content.split('\n')
-        
+
+        pprint(final_step)
+
         # Find the evidence line
         evidence_line = None
         for line in lines:

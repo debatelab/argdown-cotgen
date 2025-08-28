@@ -31,7 +31,7 @@ Note: Each step shows all nodes up to that rank level with proper indentation.
 
 from typing import List
 from ..base import BaseArgumentMapStrategy, AbortionMixin
-from ...core.models import ArgdownStructure, ArgumentMapStructure, CotStep, INDENT_SIZE
+from ...core.models import ArgdownStructure, ArgumentMapStructure, CotStep
 
 
 class ByRankStrategy(AbortionMixin, BaseArgumentMapStrategy):
@@ -191,7 +191,7 @@ class ByRankStrategy(AbortionMixin, BaseArgumentMapStrategy):
                         line.content.strip() and 
                         self._line_has_children_beyond_depth(structure, i, max_depth)):
                         # Add placeholder comment at the appropriate indentation
-                        placeholder_indent = " " * ((line.indent_level + 1) * INDENT_SIZE)
+                        placeholder_indent = " " * ((line.indent_level + 1) * line.indent_size)
                         placeholder_text = self._get_random_explanation(self.PLACEHOLDER_COMMENTS)
                         lines.append(f"{placeholder_indent}// {placeholder_text}")
         

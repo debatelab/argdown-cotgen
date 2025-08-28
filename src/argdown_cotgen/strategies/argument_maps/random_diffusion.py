@@ -573,7 +573,7 @@ class SyntaxErrorMechanism(ErrorMechanism):
         # Pick a random line with content
         line_index, selected_line = random.choice(lines_with_content)
         
-        node_label = selected_line.label if selected_line.label else "the line"
+        node_label = selected_line.label if selected_line.label else f"'{selected_line.content.strip()[:10]}...'"
         
         # Try different error types until we successfully apply one
         error_applied = False

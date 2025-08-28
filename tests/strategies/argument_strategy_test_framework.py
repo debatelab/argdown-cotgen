@@ -62,9 +62,10 @@ For complete documentation, examples, and troubleshooting, see:
 docs/STRATEGY_TESTING_FRAMEWORK.md
 """
 
+from pprint import pprint
 import pytest
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Type
+from typing import List, Dict, Any, Type, Union
 from dataclasses import dataclass
 
 from src.argdown_cotgen.core.parser import ArgdownParser
@@ -78,7 +79,7 @@ class ArgumentStrategyTestCase:
     name: str
     argdown_text: str
     description: str
-    expected_step_count: int
+    expected_step_count: Union[int, Dict[str, int]]
     expected_features: Dict[str, Any]
     abortion_rate: float = 0.0
 
@@ -94,7 +95,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -----
 (3) Conclusion.""",
         description="Basic argument with premises and conclusion",
-        expected_step_count=4,  # Will vary by strategy
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises
+            "ByFeatureStrategy": 3,
+            # v1: title, v2: scaffold, v3: main inference
+            "ByRankStrategy": 3    
+        },
         expected_features={
             "has_title": True,
             "has_premises": True,
@@ -113,7 +119,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -- modus ponens --
 (3) The streets are wet.""",
         description="Argument with explicit inference rule",
-        expected_step_count=5,  # Will vary by strategy
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises, v4: inference rules
+            "ByFeatureStrategy": 4,  
+            # v1: title, v2: scaffold, v3: premises, v4: inference rules
+            "ByRankStrategy": 4     
+        },
         expected_features={
             "has_title": True,
             "has_inference_rule": True,
@@ -135,7 +146,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -- modus ponens --
 (5) Democracy prevents corruption.""",
         description="Complex argument with multiple inference steps",
-        expected_step_count=6,  # Will vary by strategy
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises, v4: intermediate conclusions, v5: inference rules
+            "ByFeatureStrategy": 5,  
+            # v1: title, v2: scaffold, v3: main inference, v4: 1st intermediate step, v5: inference rules
+            "ByRankStrategy": 5      
+        },
         expected_features={
             "has_title": True,
             "has_multiple_inferences": True,
@@ -153,7 +169,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -----
 (3) We will see more extreme weather. {confidence: 0.76}""",
         description="Argument with YAML inline data",
-        expected_step_count=4,  # Base + YAML step
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises, v4: add YAML data
+            "ByFeatureStrategy": 4,  
+            # v1: title, v2: scaffold, v3: main inference, v4: add YAML data
+            "ByRankStrategy": 4
+        },
         expected_features={
             "has_yaml": True,
             "has_title": True,
@@ -170,7 +191,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -----
 (3) Therefore Y. // Main conclusion""",
         description="Argument with comments",
-        expected_step_count=4,  # Base + comments step
+        expected_step_count={
+            # v1: title, v2: premises, v3: conclusion, v4: add comments
+            "ByFeatureStrategy": 4,  
+            # v1: title, v2: scaffold, v3: main inference, v4: add comments
+            "ByRankStrategy": 4
+        },
         expected_features={
             "has_comments": True,
             "has_title": True,
@@ -187,7 +213,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -----
 (3) Economic growth improves quality of life. {strength: medium} // Conclusion""",
         description="Argument with both YAML and comments",
-        expected_step_count=5,  # Base + YAML + comments steps
+        expected_step_count={
+            # v1: title, v2: premises, v3: conclusion, v4: add YAML, v5: add comments
+            "ByFeatureStrategy": 5,  
+            # v1: title, v2: scaffold, v3: main inference, v4: add YAML, v5: add comments
+            "ByRankStrategy": 5
+        },
         expected_features={
             "has_yaml": True,
             "has_comments": True,
@@ -204,7 +235,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -----
 (2) This is the conclusion.""",
         description="Minimal argument structure (edge case)",
-        expected_step_count=2,
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises
+            "ByFeatureStrategy": 3,
+            # v1: title, v2: scaffold, v3: main inference
+            "ByRankStrategy": 3
+        },
         expected_features={
             "has_title": True,
             "minimal_structure": True,
@@ -219,7 +255,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -----
 (3) Technology reduces costs.""",
         description="Argument without title",
-        expected_step_count=3,
+        expected_step_count={
+            # v1: scaffold, v2: premises
+            "ByFeatureStrategy": 2,
+            # v1: scaffold, v2: main inference
+            "ByRankStrategy": 2
+        },
         expected_features={
             "no_title": True,
             "has_premises": True,
@@ -240,7 +281,12 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -- modus ponens --
 (5) A is desirable.""",
         description="Argument with chained inferences",
-        expected_step_count=6,  # Will vary by strategy
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises, v4: intermediate conclusions, v5: inference rules
+            "ByFeatureStrategy": 5,
+            # v1: title, v2: scaffold, v3: main inference, v4: 1st intermediate step, v5: inference rules
+            "ByRankStrategy": 5
+        },
         expected_features={
             "has_title": True,
             "has_chain_inference": True,
@@ -249,6 +295,33 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
         }
     ),
     
+    ArgumentStrategyTestCase(
+        name="three_step_inference_with_seps",
+        argdown_text="""(1) A leads to B.
+(2) B leads to C.
+-----
+(3) A leads to C.
+(4) C leads to D.
+-----
+(5) A leads to D.
+(6) D is desirable.
+-----
+(7) A is desirable.""",
+        description="Argument with chained inferences",
+        expected_step_count={
+            # v1: scaffold, v2: premises, v3: intermediate conclusions, v4: inference rules
+            "ByFeatureStrategy": 3,
+            # v1: scaffold, v2: main inference, v3: 1st intermediate step, v4: 2nd intermediate step, 
+            "ByRankStrategy": 4
+        },
+        expected_features={
+            "has_title": False,
+            "has_chain_inference": True,
+            "has_multiple_rules": False,
+            "statement_count": 7
+        }
+    ),
+
     ArgumentStrategyTestCase(
         name="asymmetric_premises",
         argdown_text="""<Unbalanced Argument>: Different numbers of premises per inference.
@@ -262,12 +335,63 @@ COMMON_ARGUMENT_STRATEGY_TEST_CASES = [
 -- simple inference --
 (6) Final conclusion.""",
         description="Argument with asymmetric premise structure",
-        expected_step_count=6,  # Will vary by strategy
+        expected_step_count={
+            # v1: title, v2: scaffold, v3: premises, v4: intermediate conclusions, v5: inference rules
+            "ByFeatureStrategy": 5,
+            # v1: title, v2: scaffold, v3: main inference, v4: 1st intermediate step, v5: inference rules
+            "ByRankStrategy": 5
+        },
         expected_features={
             "asymmetric": True,
             "has_title": True,
             "has_multiple_inferences": True,
             "statement_count": 6
+        }
+    ),
+    
+    ArgumentStrategyTestCase(
+        name="complex_logical_argument",
+        argdown_text="""(1) If someone is an occasional purchaser of CHI shampoo, then they are not a frequent consumer of Dial soap, or an occasional purchaser of Dove soap.
+(2) If someone infrequently (or never) consumes Dial soap, then they don't own an Alterna Haircare shampoo.
+(3) If someone occasionally purchases Dove soap, then they don't own an Alterna Haircare shampoo.
+--
+with generalized dilemma [negation variant] from (1) (2) (3)
+--
+(4) If someone occasionally purchases CHI shampoo, then they don't own an Alterna Haircare shampoo.
+(5) If someone doesn't always buy Pears soap, then they occasionally purchase CHI shampoo.
+--
+with hypothetical syllogism [negation variant] from (4) (5)
+--
+(6) If someone doesn't always buy Pears soap, then they don't own an Alterna Haircare shampoo.
+--
+with instantiation [transposition] from (6)
+--
+(7) If Michael owns an Alterna Haircare shampoo, then Michael always buys Pears soap.
+(8) Eusebio owns a Garnier shampoo or Earnest doesn't own a Paul Mitchell soap.
+(9) If Eusebio owns a Garnier shampoo, then Michael owns an Alterna Haircare shampoo.
+(10) If Earnest doesn't own a Paul Mitchell soap, then Michael owns an Alterna Haircare shampoo.
+--
+with case analysis [negation variant] from (8) (9) (10)
+--
+(11) Michael owns an Alterna Haircare shampoo.
+--
+with modus ponens from (7) (11)
+--
+(12) Michael always buys Pears soap.""",
+        description="Complex logical argument with multiple inference rules and steps",
+        expected_step_count={
+            # v1: scaffold, v2: premises, v3: intermediate conclusions, v4: inference rules
+            "ByFeatureStrategy": 4,
+            # v1: scaffold, v2: main inference, v3: 1st intermediate step, v4: 2nd intermediate step, v5: 3rd intermediate step, v6: 4th intermediate step, v7: inference rules
+            "ByRankStrategy": 7
+        },
+        expected_features={
+            "no_title": True,
+            "has_multiple_inferences": True,
+            "has_intermediate_conclusions": True,
+            "has_complex_logic": True,
+            "has_named_inference_rules": True,
+            "statement_count": 12
         }
     )
 ]
@@ -485,16 +609,33 @@ class BaseArgumentStrategyTestSuite(ABC):
     
     def _validate_step_count(self, steps: List[CotStep], test_case: ArgumentStrategyTestCase):
         """
-        Validate step count. Override in subclasses for strategy-specific logic.
+        Validate step count with strict expectations.
         
-        Default implementation allows some flexibility around expected count.
+        Supports both single expected count (int) and strategy-specific counts (Dict[str, int]).
+        Strategy-specific counts are now required and checked strictly without flexibility.
         """
-        expected = test_case.expected_step_count
+        expected_count = test_case.expected_step_count
         actual = len(steps)
         
-        # Allow some flexibility (±1) as different strategies may vary slightly
-        assert expected - 1 <= actual <= expected + 2, \
-            f"Expected ~{expected} steps for {test_case.name}, got {actual}"
+        if isinstance(expected_count, dict):
+            # Strategy-specific expected counts - strict validation
+            strategy_name = self.strategy_class.__name__
+            if strategy_name in expected_count:
+                expected = expected_count[strategy_name]
+                # Strict check - no flexibility
+                assert actual == expected, \
+                    f"Expected exactly {expected} steps for {test_case.name} with {self.strategy_name}, got {actual}"
+            else:
+                # Strategy not specified in dict - this is now an error
+                available_strategies = list(expected_count.keys())
+                assert False, \
+                    f"Strategy {strategy_name} not found in expected_step_count dict for {test_case.name}. " \
+                    f"Available strategies: {available_strategies}. Please add {strategy_name} to the expected counts."
+        else:
+            # Single expected count for all strategies - keep some flexibility for backward compatibility
+            expected = expected_count
+            assert expected - 1 <= actual <= expected + 2, \
+                f"Expected ~{expected} steps for {test_case.name} with {self.strategy_name}, got {actual}"
     
     def _validate_features(self, steps: List[CotStep], structure: ArgumentStructure, 
                           expected: Dict[str, Any]):
@@ -541,6 +682,9 @@ class BaseArgumentStrategyTestSuite(ABC):
         """Validate general quality of generated steps."""
         assert len(steps) >= 1, "Should generate at least one step"
         
+        # Check that first step is always v1
+        assert steps[0].version == "v1", f"First step should always be v1, got {steps[0].version}"
+        
         # Check version numbering
         for i, step in enumerate(steps):
             assert step.version, f"Step {i} should have a version"
@@ -555,6 +699,9 @@ class BaseArgumentStrategyTestSuite(ABC):
         
         # Check consecutive numbering within each step
         self._validate_consecutive_numbering(steps)
+        
+        # Check consecutive version numbering across steps
+        self._validate_consecutive_version_numbering(steps)
     
     def _validate_consecutive_numbering(self, steps: List[CotStep]):
         """
@@ -596,6 +743,32 @@ class BaseArgumentStrategyTestSuite(ABC):
                         f"Numbered lines in step:\n{step_preview}"
                     )
 
+    def _validate_consecutive_version_numbering(self, steps: List[CotStep]):
+        """
+        Validate that step versions are consecutive starting from v1.
+        
+        This is critical to ensure strategy implementation doesn't skip steps
+        or have version numbering bugs.
+        
+        Args:
+            steps: Generated CoT steps from the strategy
+            
+        Raises:
+            AssertionError: If versions are not consecutive starting from v1
+        """
+        if not steps:
+            return
+        
+        for i, step in enumerate(steps):
+            expected_version = f"v{i + 1}"
+            actual_version = step.version
+            
+            assert actual_version == expected_version, (
+                f"Step {i + 1} has version '{actual_version}', expected '{expected_version}'. "
+                f"This indicates a bug in strategy version numbering - steps should be "
+                f"consecutively numbered starting from v1."
+            )
+
     def _validate_final_content_reconstruction(self, steps: List[CotStep], original_text: str):
         """
         Validate that the final step reconstructs the original argdown content exactly.
@@ -628,8 +801,15 @@ class BaseArgumentStrategyTestSuite(ABC):
         if not steps:
             return
         
+        pprint(steps)
+
         final_content = steps[-1].content.strip()
         
+        print("\n--- Original Argdown Text ---")
+        print(original_text)
+        print("\n--- Final Step Content ---")
+        print(final_content)
+
         # Normalize both texts for comparison (handle whitespace differences)
         def normalize_argdown(text: str) -> set:
             """Normalize argdown text to a set of non-empty lines for comparison."""

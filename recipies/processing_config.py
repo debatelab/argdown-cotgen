@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Processing Configuration for Dataset Processor Template
+Processing Configuration Template for Dataset Processor Script
 
 This module defines the processing function that will be applied to each item
 in the dataset. Modify the process_item function below to implement your
@@ -140,7 +140,7 @@ def validate_item(item: Dict[str, Any]) -> bool:
     return True
 
 
-def post_process_dataset(dataset, args: argparse.Namespace) -> dict:
+def post_process_dataset(dataset, args: argparse.Namespace) -> tuple[Any,dict]:
     """
     Perform any post-processing on the entire dataset after individual item processing.
     
@@ -159,6 +159,4 @@ def post_process_dataset(dataset, args: argparse.Namespace) -> dict:
                 'processing_summary': 'All items processed successfully'
             }
     """
-    return {
-        'processing_completed': True
-    }
+    return dataset, {'processing_completed': True}

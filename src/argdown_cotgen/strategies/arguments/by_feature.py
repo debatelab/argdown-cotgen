@@ -40,6 +40,7 @@ Notes:
 * Variant: Add title and gist at the very end rather than at the beginning.
 """
 
+import copy
 from typing import List, Optional, Dict
 import re
 from ..base import BaseArgumentStrategy, CotStep, AbortionMixin
@@ -129,37 +130,37 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         steps = []
         
         # Step 1: Title and Gist
-        title_step = self._create_title_step(parsed_structure)
+        title_step = self._create_title_step(parsed_structure, len(steps) + 1)
         if title_step:
             steps.append(title_step)
         
         # Step 2: Scaffold with final conclusion
-        scaffold_step = self._create_scaffold_step(parsed_structure)
+        scaffold_step = self._create_scaffold_step(parsed_structure, len(steps) + 1)
         if scaffold_step:
             steps.append(scaffold_step)
         
         # Step 3: Add all premises
-        premises_step = self._create_premises_step(parsed_structure)
+        premises_step = self._create_premises_step(parsed_structure, len(steps) + 1)
         if premises_step:
             steps.append(premises_step)
         
         # Step 4: Add intermediate conclusions
-        intermediate_step = self._create_intermediate_conclusions_step(parsed_structure)
+        intermediate_step = self._create_intermediate_conclusions_step(parsed_structure, len(steps) + 1)
         if intermediate_step:
             steps.append(intermediate_step)
         
         # Step 5: Add inference information
-        inference_step = self._create_inference_step(parsed_structure, len(steps))
+        inference_step = self._create_inference_step(parsed_structure, len(steps) + 1)
         if inference_step:
             steps.append(inference_step)
         
         # Step 6: Add YAML inline data
-        yaml_step = self._create_yaml_step(parsed_structure, len(steps))
+        yaml_step = self._create_yaml_step(parsed_structure, len(steps) + 1)
         if yaml_step:
             steps.append(yaml_step)
         
         # Step 7: Add comments
-        comment_step = self._create_comment_step(parsed_structure, len(steps))
+        comment_step = self._create_comment_step(parsed_structure, len(steps) + 1)
         if comment_step:
             steps.append(comment_step)
         
@@ -169,8 +170,8 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         
         return steps
     
-    def _create_title_step(self, structure: ArgumentStructure) -> Optional[CotStep]:
-        """Create the title and gist step (v1)."""
+    def _create_title_step(self, structure: ArgumentStructure, step_num: int) -> Optional[CotStep]:
+        """Create the title and gist step."""
         preamble_lines = self._get_preamble_lines(structure)
         if not preamble_lines:
             return None
@@ -178,18 +179,18 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         content = self._format_statement_line(preamble_lines[0])
         explanation = self._get_random_explanation(self.TITLE_EXPLANATIONS)
         
-        return self._create_step("v1", content, explanation)
+        return self._create_step(f"v{step_num}", content, explanation)
     
-    def _create_scaffold_step(self, structure: ArgumentStructure) -> CotStep:
-        """Create the scaffold step with final conclusion (v2)."""
+    def _create_scaffold_step(self, structure: ArgumentStructure, step_num: int) -> CotStep:
+        """Create the scaffold step with final conclusion."""
         final_conclusion = structure.final_conclusion
         scaffold_content = self._create_premise_conclusion_scaffold(structure, final_conclusion)
         explanation = self._get_random_explanation(self.SCAFFOLD_EXPLANATIONS)
         
-        return self._create_step("v2", scaffold_content, explanation)
+        return self._create_step(f"v{step_num}", scaffold_content, explanation)
     
-    def _create_premises_step(self, structure: ArgumentStructure) -> Optional[CotStep]:
-        """Create step that adds ALL basic premises (v3)."""
+    def _create_premises_step(self, structure: ArgumentStructure, step_num: int) -> Optional[CotStep]:
+        """Create step that adds ALL basic premises."""
         
         classification = self._classify_statements_by_feature(structure)
         premises = classification['premises']
@@ -229,57 +230,43 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         content = '\n'.join(lines)
         explanation = self._get_random_explanation(self.PREMISES_EXPLANATIONS)
         
-        return self._create_step("v3", content, explanation)
+        return self._create_step(f"v{step_num}", content, explanation)
     
-    def _create_intermediate_conclusions_step(self, structure: ArgumentStructure) -> Optional[CotStep]:
-        """Create step that adds intermediate conclusions (v4)."""
+    def _create_intermediate_conclusions_step(self, structure: ArgumentStructure, step_num: int) -> Optional[CotStep]:
+        """Create step that adds intermediate conclusions."""
         
         classification = self._classify_statements_by_feature(structure)
-        premises = classification['premises']
         intermediates = classification['intermediate']
         
         if not intermediates:
             return None
         
-        # Build complete argument with premises + intermediates + final conclusion
-        lines = []
-        
-        # Add preamble
-        preamble_lines = self._get_preamble_lines(structure)
-        if preamble_lines:
-            lines.append(self._format_statement_line(preamble_lines[0]))
-            lines.append("")
-        
-        statement_counter = 1
-        
-        # Add all premises first
-        for premise in premises:
-            content = self._extract_statement_content(premise)
-            lines.append(f"({statement_counter}) {content}")
-            statement_counter += 1
-        
-        # Add separator after premises
-        lines.append("-----")
-        
-        # Add all intermediate conclusions
-        for intermediate in intermediates:
-            content = self._extract_statement_content(intermediate)
-            lines.append(f"({statement_counter}) {content}")
-            statement_counter += 1
-        
-        # Add separator before final conclusion
-        lines.append("-----")
-        
-        # Add final conclusion
-        final_conclusion = structure.final_conclusion
-        if final_conclusion:
-            conclusion_content = self._extract_statement_content(final_conclusion)
-            lines.append(f"({statement_counter}) {conclusion_content}")
-        
-        content = '\n'.join(lines)
+        structure = copy.deepcopy(structure)
+
+        # turn all inference rule lines into separators
+        for line in structure.lines:
+            if line.is_inference_rule:
+                line.is_separator = True
+                line.is_inference_rule = False
+                line.content = "-----"
+
+        # remove consecutive separators
+        new_lines = []
+        prev_was_separator = False
+        for line in structure.lines:
+            if line.is_separator:
+                if not prev_was_separator:
+                    new_lines.append(line)
+                prev_was_separator = True
+            else:
+                new_lines.append(line)
+                prev_was_separator = False
+        structure.lines = new_lines
+
+        content = self._format_argument_complete(structure, include_yaml=False, include_comments=False)
         explanation = self._get_random_explanation(self.INTERMEDIATE_CONCLUSIONS_EXPLANATIONS)
         
-        return self._create_step("v4", content, explanation)
+        return self._create_step(f"v{step_num}", content, explanation)
     
     def _classify_statements_by_feature(self, structure: ArgumentStructure) -> Dict[str, List[ArgumentStatementLine]]:
         """Classify all statements by their logical role/feature."""
@@ -313,20 +300,25 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
     
     def _get_derived_statement_numbers(self, structure: ArgumentStructure) -> set:
         """
-        Get the set of statement numbers that are derived by inference rules.
+        Get the set of statement numbers that are derived by inference rules or separator lines.
         
-        A statement is a conclusion iff it is the first statement to appear after an inference line.
+        A statement is a conclusion iff it is the first statement to appear after an inference line or separator.
         We allow for non-statement lines (comments, etc.) to appear between inference and conclusion.
         """
         derived_numbers = set()
+        
+        # Get both inference rules and separator lines
         inference_rules = self._get_inference_rules(structure)
+        separator_lines = [line for line in structure.lines if line.is_separator]
+        all_rule_lines = inference_rules + separator_lines
+        
         numbered_statements = self._get_numbered_statements(structure)
         
-        for rule in inference_rules:
+        for rule in all_rule_lines:
             if not rule.line_number:
                 continue
                 
-            # Find the first statement line that appears after this inference rule
+            # Find the first statement line that appears after this inference rule or separator
             first_statement_after_rule = None
             min_line_number = float('inf')
             
@@ -377,7 +369,7 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         content = self._format_argument_complete(structure, include_yaml=False, include_comments=False)
         explanation = self._get_random_explanation(self.INFERENCE_EXPLANATIONS)
         
-        return self._create_step(f"v{step_count + 1}", content, explanation)
+        return self._create_step(f"v{step_count}", content, explanation)
     
     def _create_yaml_step(self, structure: ArgumentStructure, step_count: int) -> Optional[CotStep]:
         """Create the YAML inline data step."""
@@ -388,7 +380,7 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         content = self._format_argument_complete(structure, include_yaml=True, include_comments=False)
         explanation = self._get_random_explanation(self.YAML_EXPLANATIONS)
         
-        return self._create_step(f"v{step_count + 1}", content, explanation)
+        return self._create_step(f"v{step_count}", content, explanation)
     
     def _create_comment_step(self, structure: ArgumentStructure, step_count: int) -> Optional[CotStep]:
         """Create the final comments step."""
@@ -399,4 +391,4 @@ class ByFeatureStrategy(AbortionMixin, BaseArgumentStrategy):
         content = self._format_argument_complete(structure, include_yaml=True, include_comments=True)
         explanation = self._get_random_explanation(self.COMMENT_EXPLANATIONS)
         
-        return self._create_step(f"v{step_count + 1}", content, explanation)
+        return self._create_step(f"v{step_count}", content, explanation)

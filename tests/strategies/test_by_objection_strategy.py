@@ -5,6 +5,7 @@ This module contains comprehensive tests for the by-objection argument map strat
 including both common framework tests and by-objection specific behavior validation.
 """
 
+from pprint import pprint
 from typing import Type
 from src.argdown_cotgen.strategies.argument_maps.by_objection import ByObjectionStrategy
 from src.argdown_cotgen.strategies.base import BaseArgumentMapStrategy
@@ -31,7 +32,7 @@ class TestByObjectionStrategy(BaseMapStrategyTestSuite):
         since it groups all supports together when no objections exist to create
         natural breaking points.
         """
-        expected = test_case.expected_step_count
+        #expected = test_case.expected_step_count
         actual = len(steps)
         
         # Strategy-specific adjustments
@@ -43,8 +44,9 @@ class TestByObjectionStrategy(BaseMapStrategyTestSuite):
                 f"ByObjection strategy expected {expected_for_objection} steps for {test_case.name} (pure support structure), got {actual}"
         else:
             # Use default validation for other test cases
-            assert expected - 1 <= actual <= expected + 2, \
-                f"Expected ~{expected} steps for {test_case.name}, got {actual}"
+            super()._validate_step_count(steps, test_case)
+            # assert expected - 1 <= actual <= expected + 2, \
+            #     f"Expected ~{expected} steps for {test_case.name}, got {actual}"
 
 
 class TestByObjectionSpecificBehavior:
@@ -222,8 +224,10 @@ class TestByObjectionSpecificBehavior:
         
         steps = strategy.generate(structure)
         
+        pprint(steps)
+
         # Should handle complex structure without errors
-        assert len(steps) >= 2
+        assert len(steps) == 4
         
         # All steps should have meaningful content
         for step in steps:

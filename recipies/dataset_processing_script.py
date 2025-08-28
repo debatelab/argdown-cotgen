@@ -6,7 +6,7 @@ This module provides a fully configurable script for creating recipes that proce
 argumentation datasets using the argdown-cotgen library. It demonstrates the standard pattern for:
 
 - Command-line argument parsing with configurable options
-- Structured logging with debug capabilities
+- Simple console output for progress tracking
 - Dataset loading using Hugging Face datasets library
 - Error handling and validation
 - Dataset loading and processing workflows
@@ -31,12 +31,8 @@ Example:
     # Load specific split and use custom config
     python -m recipies.dataset_processing_script --input "username/dataset-name" --output ./processed/ --split train --config my_config.py
 
-    # With debug logging and custom strategy
-    python -m recipies.dataset_processing_script --input ./data/argdown_dataset.json \
-                                       --output ./processed/ \
-                                       --debug \
-                                       --strategy breadth_first \
-                                       --batch-size 50
+    # With debug mode (process only 50 items, no upload)
+    python -m recipies.dataset_processing_script --input ./data/argdown_dataset.json --output ./processed/ --debug
 
 Supported Input Formats:
     - JSON files (.json)
@@ -56,22 +52,23 @@ Output Formats:
 Arguments:
     --input: Path to input dataset, directory, or HF Hub name (required)
     --output: Path to output directory (required)
-    --debug: Enable debug logging
+    --debug: Enable debug mode (process only 50 items, disable uploads)
     --log-file: Optional log file path
-    --strategy: Processing strategy to use
-    --batch-size: Batch size for Dataset.map() processing
     --dry-run: Perform validation without actual processing
     --hub-repo-id: Optional HF Hub repository for uploading results
     --split: Load only a specific split from DatasetDict (e.g., 'train', 'test', 'validation')
+    --subset: Load only a specific subset/configuration (e.g., 'aaac01-thinking', 'aaac02-thinking')
     --config: Path to processing configuration file (default: processing_config.py)
 
 Author: Gregor Betz
 Created: August 2025
 """
 
+import os
 import argparse
-import logging
+import random
 import sys
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, Union
 import json
@@ -81,38 +78,20 @@ from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict,
 # Type alias for all possible dataset types
 DatasetType = Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]
 
-# Configure logging
+
 def setup_logging(debug: bool = False, log_file: Optional[str] = None) -> logging.Logger:
-    """
-    Set up simple logging for the recipe.
-    
-    Args:
-        debug: Enable debug mode (sets level to DEBUG, otherwise INFO)
-        log_file: Optional path to log file
-    
-    Returns:
-        Configured logger instance
-    """
+    """Setup simple logging configuration."""
     level = logging.DEBUG if debug else logging.INFO
     
-    # Configure basic logging
-    log_format = '%(asctime)s - %(levelname)s - %(message)s'
-    
-    if log_file:
-        logging.basicConfig(
-            level=level,
-            format=log_format,
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-    else:
-        logging.basicConfig(
-            level=level,
-            format=log_format,
-            stream=sys.stdout
-        )
+    # Configure logging
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            *([logging.FileHandler(log_file)] if log_file else [])
+        ]
+    )
     
     return logging.getLogger(__name__)
 
@@ -171,7 +150,7 @@ def validate_arguments(args: argparse.Namespace, logger: logging.Logger) -> bool
     return True
 
 
-def load_hf_dataset(input_path: str, logger: logging.Logger, split: Optional[str] = None) -> DatasetType:
+def load_hf_dataset(input_path: str, logger: logging.Logger, split: Optional[str] = None, subset: Optional[str] = None) -> DatasetType:
     """
     Load dataset from input path using Hugging Face datasets library.
     
@@ -179,6 +158,7 @@ def load_hf_dataset(input_path: str, logger: logging.Logger, split: Optional[str
         input_path: Path to input dataset, directory, or HF Hub dataset name
         logger: Logger instance
         split: Optional specific split to load from DatasetDict (e.g., 'train', 'test', 'validation')
+        subset: Optional specific subset/configuration to load (e.g., 'aaac01-thinking', 'aaac02-thinking')
     
     Returns:
         Dataset, DatasetDict, IterableDataset, or IterableDatasetDict object
@@ -205,11 +185,11 @@ def load_hf_dataset(input_path: str, logger: logging.Logger, split: Optional[str
         
         elif path.is_dir():
             # Load from directory (HF dataset format) - don't specify split to get all splits
-            dataset = load_dataset(str(path))
+            dataset = load_dataset(str(path), name=subset) if subset else load_dataset(str(path))
         
         else:
             # Try to load as a Hugging Face Hub dataset - don't specify split to get all splits
-            dataset = load_dataset(input_path)
+            dataset = load_dataset(input_path, name=subset) if subset else load_dataset(input_path)
         
         # If user requested a specific split, extract it from DatasetDict
         if split and isinstance(dataset, (DatasetDict, IterableDatasetDict)):
@@ -312,29 +292,53 @@ def process_dataset(dataset: DatasetType, args: argparse.Namespace, logger: logg
     Returns:
         Processed Dataset object (same type as input)
     """
-    def process_item_wrapper(item: Dict[str, Any]) -> Dict[str, Any]:
+    def process_item_wrapper(item: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Wrapper around the configurable process_item function."""
         # Validate item if validation function exists
         if hasattr(config_module, 'validate_item'):
             if not config_module.validate_item(item):
-                logger.warning(f"Item validation failed, skipping: {item}")
+                item_str = str(item)[:128]
+                logger.warning(f"Item validation failed, skipping: {item_str}")
                 return item
         
         # Call the configurable processing function
         return config_module.process_item(item, args)
     
-    logger.info(f"Processing dataset using strategy: {args.strategy}")
+    logger.info("Processing dataset ...")
+    
+    # Debug mode: limit to 50 items
+    if args.debug:
+        logger.info("Debug mode enabled: limiting to 50 items")
+        if isinstance(dataset, Dataset):
+            # For Dataset objects
+            dataset = dataset.select(range(min(50, len(dataset))))
+        elif isinstance(dataset, DatasetDict):
+            # For DatasetDict objects - limit each split
+            limited_dict = {}
+            for split_name, split_dataset in dataset.items():
+                limited_dict[split_name] = split_dataset.select(range(min(50, len(split_dataset))))
+            dataset = DatasetDict(limited_dict)
+        elif isinstance(dataset, IterableDataset):
+            # For IterableDataset objects
+            dataset = dataset.take(50)
+        elif isinstance(dataset, IterableDatasetDict):
+            # For IterableDatasetDict objects - limit each split
+            limited_dict = {}
+            for split_name, split_dataset in dataset.items():
+                limited_dict[split_name] = split_dataset.take(50)
+            dataset = IterableDatasetDict(limited_dict)
+        else:
+            logger.warning("Cannot limit dataset size for this dataset type in debug mode")
     
     processed_dataset = dataset.map(
         process_item_wrapper,
-        batch_size=args.batch_size if args.batch_size > 1 else 1,
-        batched=args.batch_size > 1
+        fn_kwargs={"hash": random.getrandbits(64)}  # Ensure unique hash per run (for diasbling caching)
     )
         
     return processed_dataset
 
 
-def save_results(dataset: DatasetType, output_path: str, logger: logging.Logger, hub_repo_id: Optional[str] = None) -> None:
+def save_results(dataset: DatasetType, output_path: str, logger: logging.Logger, hub_kwargs: Optional[Dict[str, Any]] = None, debug: bool = False) -> None:
     """
     Save processed dataset using Hugging Face datasets.
     Handles Dataset, DatasetDict, IterableDataset, or IterableDatasetDict.
@@ -343,7 +347,7 @@ def save_results(dataset: DatasetType, output_path: str, logger: logging.Logger,
         dataset: Processed Dataset object (any type)
         output_path: Path to output directory
         logger: Logger instance
-        hub_repo_id: Optional Hugging Face Hub repository ID for uploading
+        hub_kwargs: Optional Hugging Face Hub repository kwargs for uploading
     """
     logger.info(f"Saving dataset to: {output_path}")
     
@@ -387,10 +391,14 @@ def save_results(dataset: DatasetType, output_path: str, logger: logging.Logger,
                 pass
         
         # Upload to Hugging Face Hub (optional)
-        if hub_repo_id:
-            logger.info(f"Uploading dataset to Hugging Face Hub: {hub_repo_id}")
-            dataset.push_to_hub(hub_repo_id)
-            logger.info(f"Dataset successfully uploaded to: https://huggingface.co/datasets/{hub_repo_id}")
+        if hub_kwargs and not debug:
+            logger.info(f"Uploading dataset to Hugging Face Hub: {hub_kwargs}")
+            dataset.push_to_hub(
+                **hub_kwargs,
+            )
+            logger.info(f"Dataset successfully uploaded to: https://huggingface.co/datasets/{hub_kwargs.get('repo_id', 'unknown')}")
+        elif hub_kwargs and debug:
+            logger.info(f"Debug mode: Skipping upload to Hugging Face Hub: {hub_kwargs}")
         
         # Log summary statistics
         logger.info("Processing summary:")
@@ -399,12 +407,11 @@ def save_results(dataset: DatasetType, output_path: str, logger: logging.Logger,
         logger.info(f"  Created dataset: {dataset}")
         
         logger.info(f"  JSONL files: {saved_files}")
-        if hub_repo_id:
-            logger.info(f"  Hub repository: {hub_repo_id}")
-        logger.info("Processing completed successfully")
+        if hub_kwargs:
+            logger.info(f"  Hub repository and dataset kwargs: {hub_kwargs}")
     
     except Exception as e:
-        logger.error(f"Failed to save dataset: {e}")
+        logger.error(f"Failed to save or upload dataset: {e}")
         raise e
 
 
@@ -432,6 +439,9 @@ Examples:
   # Load specific split from DatasetDict
   python -m recipies.dataset_processing_script --input "username/dataset-name" --output ./processed/ --split train
   
+  # Load specific subset from dataset (e.g., DeepA2-Conversations)
+  python -m recipies.dataset_processing_script --input "DebateLabKIT/deepa2-conversations" --output ./processed/ --subset aaac01-thinking
+  
   # Use custom configuration file
   python -m recipies.dataset_processing_script --input ./data/dataset.json --output ./processed/ --config my_config.py
   
@@ -439,10 +449,10 @@ Examples:
   python -m recipies.dataset_processing_script --input ./hf_dataset/ --output ./processed/
   
   # With debug and custom options
-  python -m recipies.dataset_processing_script --input ./data/dataset.json --output ./processed/ --debug --strategy breadth_first
+  python -m recipies.dataset_processing_script --input ./data/dataset.json --output ./processed/ --debug
   
-  # Dry run with batch processing
-  python -m recipies.dataset_processing_script --input ./data/dataset.json --output ./processed/ --dry-run --batch-size 10
+  # Dry run
+  python -m recipies.dataset_processing_script --input ./data/dataset.json --output ./processed/ --dry-run
   
   # Upload to Hugging Face Hub
   python -m recipies.dataset_processing_script --input ./data/dataset.json --output ./processed/ --hub-repo-id "username/processed-dataset"
@@ -466,26 +476,12 @@ Examples:
     parser.add_argument(
         '--debug',
         action='store_true',
-        help='Enable debug logging'
+        help='Enable debug mode (process only 50 items, disable uploads)'
     )
     
     parser.add_argument(
         '--log-file',
         help='Optional path to log file'
-    )
-    
-    parser.add_argument(
-        '--strategy',
-        choices=['breadth_first', 'depth_first', 'by_rank', 'random'],
-        default='breadth_first',
-        help='Processing strategy to use (default: breadth_first)'
-    )
-    
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=10,
-        help='Batch size for processing (default: 10)'
     )
     
     parser.add_argument(
@@ -500,8 +496,18 @@ Examples:
     )
     
     parser.add_argument(
+        '--hub-config-name',
+        help='Optional Hugging Face Hub config name to upload results (e.g., "cot-thinking-subset-01")'
+    )
+    
+    parser.add_argument(
         '--split',
         help='Load only a specific split from DatasetDict (e.g., "train", "test", "validation"). If not specified, all splits will be loaded and processed.'
+    )
+    
+    parser.add_argument(
+        '--subset',
+        help='Load only a specific subset/configuration from the dataset (e.g., "aaac01-thinking", "aaac02-thinking"). If not specified, the default subset will be loaded.'
     )
     
     parser.add_argument(
@@ -561,14 +567,14 @@ def main() -> int:
         config_module = load_processing_config(args.config, logger)
         
         # Load dataset
-        dataset = load_hf_dataset(args.input, logger, args.split)
+        dataset = load_hf_dataset(args.input, logger, args.split, args.subset)
         
         if args.dry_run:
-            logger.info(f"DRY RUN: Would process dataset with strategy '{args.strategy}'")
             logger.info(f"DRY RUN: Using configuration file: {args.config}")
             logger.info(f"DRY RUN: Output would be saved to: {args.output}")
             if args.hub_repo_id:
                 logger.info(f"DRY RUN: Would upload to Hub repository: {args.hub_repo_id}")
+                logger.info(f"DRY RUN: Would use Hub config name: {args.hub_config_name}" if args.hub_config_name else "DRY RUN: No explicit Hub config name specified")
             logger.info("Dry run completed successfully")
             return 0
         
@@ -577,11 +583,25 @@ def main() -> int:
         
         # Post-process if function exists
         if hasattr(config_module, 'post_process_dataset'):
-            post_process_info = config_module.post_process_dataset(processed_dataset, args)
+            processed_dataset, post_process_info = config_module.post_process_dataset(processed_dataset, args)
             logger.info(f"Post-processing completed: {post_process_info}")
         
         # Save results
-        save_results(processed_dataset, args.output, logger, args.hub_repo_id)
+        if args.hub_repo_id:
+            hub_kwargs = {
+                'repo_id': args.hub_repo_id,
+                'private': False,
+                'create_pr': True  
+            }
+            if args.split:
+                hub_kwargs['split'] = args.split
+            if args.hub_config_name:
+                hub_kwargs['config_name'] = args.hub_config_name
+            elif args.subset:
+                hub_kwargs['config_name'] = args.subset
+        else:
+            hub_kwargs = None
+        save_results(processed_dataset, args.output, logger, hub_kwargs=hub_kwargs, debug=args.debug)
         
         logger.info("Processing completed successfully.")
         return 0

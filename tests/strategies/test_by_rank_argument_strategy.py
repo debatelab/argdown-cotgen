@@ -41,15 +41,14 @@ class TestByRankArgumentStrategy(BaseArgumentStrategyTestSuite):
         structure = self.parser.parse(argdown_text)
         steps = self.strategy.generate(structure, abortion_rate=0.0)
         
-        # Should have 6 steps based on actual output:
+        # Should have 5 steps based on actual output:
         # v1: Title
         # v2: Scaffold with final conclusion
         # v3: Main inference step (statements that directly lead to final conclusion)
         # v4: First sub-argument (for statement 3)
-        # v5: Second sub-argument (for statement 4) - actually shows premise for statement 3
-        # v6: Complete argument with all inference rules
+        # v5: Complete argument with all inference rules
         
-        assert len(steps) == 6, f"Expected 6 steps, got {len(steps)}"
+        assert len(steps) == 5, f"Expected 5 steps, got {len(steps)}"
         
         # Check step progression
         

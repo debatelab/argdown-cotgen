@@ -1,7 +1,7 @@
 """Parser for argdown snippets using indentation-based analysis."""
 
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from .models import (
     ArgumentMapLine, 
     ArgumentStatementLine, 
@@ -30,7 +30,7 @@ class ArgdownParser:
     # YAML inline data pattern (matches {...} at end of line, before optional comment)
     # Uses a more sophisticated pattern to handle nested braces
     YAML_INLINE_PATTERN = re.compile(r'\{(?:[^{}]|{[^}]*})*\}(?=\s*(//|$))')
-    def _extract_yaml_and_comment(self, line: str) -> tuple[str, Optional[str], bool, Optional[str]]:
+    def _extract_yaml_and_comment(self, line: str) -> Tuple[str, Optional[str], bool, Optional[str]]:
         """Extract YAML inline data and comment from line.
         Returns (cleaned_line, yaml_inline_data, has_comment, comment_content)
         """
@@ -57,7 +57,7 @@ class ArgdownParser:
     
     # Patterns for arguments  
     NUMBERED_STATEMENT_PATTERN = re.compile(r'^(\s*)\((\d+)\)\s*(.+)$')
-    INFERENCE_RULE_PATTERN = re.compile(r'^(\s*)--\s*(.+)\s*--\s*$')
+    INFERENCE_RULE_PATTERN = re.compile(r'^(\s*)--\s*([^-\s].*|.*[^-\s].*)\s*--\s*$')
     SEPARATOR_PATTERN = re.compile(r'^(\s*)-----?\s*$')
     PREAMBLE_PATTERN = re.compile(r'^(\s*)<([^>]+)>:\s*(.+)$')
     
@@ -113,16 +113,21 @@ class ArgdownParser:
     def _parse_argument_map(self, lines: List[str]) -> ArgumentMapStructure:
         """Parse an argument map structure."""
         parsed_lines = []
+
+        # First, we need to dynamically calculate the indent_size for this particular argdown snippet
+        indent_size = self._calculate_indent_size(lines)
+
         for i, line in enumerate(lines):
             # Extract YAML and comments first
             cleaned_line, yaml_inline_data, has_comment, comment_content = self._extract_yaml_and_comment(line)
-            indent_level = self._calculate_indent_level(cleaned_line)
+            indent_level = self._calculate_indent_level(cleaned_line, indent_size=indent_size)
             content = cleaned_line.strip()
             # Handle empty lines (including standalone comments)
             if not content:
                 parsed_line = ArgumentMapLine(
                     content="",
                     indent_level=0,
+                    indent_size=indent_size,
                     line_number=i + 1,
                     original_line=line,
                     support_type=None,
@@ -143,7 +148,7 @@ class ArgdownParser:
                 label = dialectical_arg_match.group(3)
                 is_claim = False
                 content = f"<{label}>: {dialectical_arg_match.group(4)}"
-                indent_level = self._calculate_indent_level(dialectical_arg_match.group(1))
+                indent_level = self._calculate_indent_level(dialectical_arg_match.group(1), indent_size=indent_size)
             else:
                 # Check for dialectical relations: +> content
                 dialectical_match = self.DIALECTICAL_PATTERN.match(cleaned_line)
@@ -157,7 +162,7 @@ class ArgdownParser:
                     label = None
                     is_claim = True
                     content = f"[{claim_match.group(2)}]: {claim_match.group(3)}"
-                    indent_level = self._calculate_indent_level(claim_match.group(1))
+                    indent_level = self._calculate_indent_level(claim_match.group(1), indent_size=indent_size)
                 else:
                     # Check for arguments <Argument>: content  
                     arg_match = self.ARGUMENT_PATTERN.match(cleaned_line)
@@ -173,6 +178,7 @@ class ArgdownParser:
             parsed_line = ArgumentMapLine(
                 content=content,
                 indent_level=indent_level,
+                indent_size=indent_size,
                 line_number=i + 1,
                 original_line=line,
                 support_type=support_type,
@@ -247,14 +253,33 @@ class ArgdownParser:
                 yaml_inline_data=yaml_inline_data
             )
             parsed_lines.append(parsed_line)
+        # Post-process to identify multi-line inference rules
+        self._identify_multiline_inference_rules(parsed_lines)
         # Post-process to identify final conclusion
         self._identify_conclusions(parsed_lines)
         return ArgumentStructure(parsed_lines)
     
-    def _calculate_indent_level(self, line: str) -> int:
-        """Calculate indentation level (number of INDENT_SIZE-space units)."""
+    def _calculate_indent_size(self, lines: list[str]) -> int:
+        """Calculate the tab size / indent size given an argdown map snippet (2,4,etc.)"""
+
+        # Calcualte minimal indent size > 0 of any dialectical relation
+        minimal_indent = 0
+        for line in lines:
+            cleaned_line = line.strip()
+            if self.DIALECTICAL_PATTERN.match(cleaned_line):
+                # count left trailing white spaces in cleaned_line
+                count_whitespace = len(line) - len(line.lstrip())
+                if minimal_indent == 0 or (0 < count_whitespace < minimal_indent):
+                    minimal_indent = count_whitespace
+
+        # Ensure indent size is a multiple of 2 and at least 2
+        return max(2, (minimal_indent // 2) * 2)
+
+
+    def _calculate_indent_level(self, line: str, indent_size: int = INDENT_SIZE) -> int:
+        """Calculate indentation level (number of indent_size-space units)."""
         leading_spaces = len(line) - len(line.lstrip())
-        return leading_spaces // INDENT_SIZE
+        return leading_spaces // indent_size
     
     def _parse_dialectical_type(self, symbol: str) -> DialecticalType:
         """Parse dialectical relation symbol into DialecticalType."""
@@ -271,26 +296,74 @@ class ArgdownParser:
         }
         return symbol_map.get(symbol, DialecticalType.SUPPORTS)
     
+    def _identify_multiline_inference_rules(self, lines: List[ArgumentStatementLine]) -> None:
+        """
+        Identify and mark multi-line inference rules.
+        
+        Multi-line inference rules have the pattern:
+        --
+        rule text (possibly multiple lines)
+        --
+        
+        This method finds such patterns and marks all lines within them as is_inference_rule=True.
+        """
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            
+            # Look for opening "--" line
+            if line.content.strip() == "--":
+                # Find the closing "--" line
+                j = i + 1
+                while j < len(lines) and lines[j].content.strip() != "--":
+                    j += 1
+                
+                # If we found a closing "--", mark all lines in between as inference rules
+                if j < len(lines) and lines[j].content.strip() == "--":
+                    # Mark opening "--", all content lines, and closing "--" as inference rules
+                    for k in range(i, j + 1):
+                        lines[k].is_inference_rule = True
+                    i = j + 1  # Continue after the closing "--"
+                else:
+                    i += 1  # No closing "--" found, continue
+            else:
+                i += 1
+
     def _identify_conclusions(self, lines: List[ArgumentStatementLine]) -> None:
-        """Identify which numbered statements are conclusions vs premises."""
+        """
+        Identify which numbered statements are conclusions vs premises.
+        
+        Uses multiple heuristics:
+        1. The last numbered statement is typically the final conclusion
+        2. Statements after separators (-----) are conclusions  
+        3. Statements after inference rules are conclusions
+        """
         numbered_lines = [line for line in lines if line.is_numbered_statement]
         
         if not numbered_lines:
             return
         
-        # Simple heuristic: the last numbered statement is typically the final conclusion
-        # More sophisticated logic could be added based on separators and context
+        # Mark the last numbered statement as the final conclusion
         if numbered_lines:
             numbered_lines[-1].is_conclusion = True
             numbered_lines[-1].is_premise = False
         
-        # Additional logic: statements after separators are often conclusions
+        # Find statements after separators or inference rule blocks
         for i, line in enumerate(lines):
-            if line.is_separator and i + 1 < len(lines):
-                next_line = lines[i + 1]
-                if next_line.is_numbered_statement:
-                    next_line.is_conclusion = True
-                    next_line.is_premise = False
+            if (line.is_separator or line.is_inference_rule) and i + 1 < len(lines):
+                # Look for the next numbered statement after this separator/inference rule
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j]
+                    if next_line.is_numbered_statement:
+                        # This statement follows a separator or inference rule, so it's likely a conclusion
+                        next_line.is_conclusion = True
+                        next_line.is_premise = False
+                        break
+                    elif next_line.is_numbered_statement or next_line.content.strip():
+                        # Hit another numbered statement or non-empty content, stop looking
+                        break
+                    j += 1
 
     def _extract_comment(self, line: str) -> tuple[str, bool, Optional[str]]:
         """Extract comment from line and return (cleaned_line, has_comment, comment_content)."""

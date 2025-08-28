@@ -214,7 +214,7 @@ class BaseArgumentMapStrategy(BaseStrategy):
         """
         # Handle standalone comments (empty content but has comment)
         if not line.content.strip() and include_comments and line.has_comment:
-            indent = " " * (line.indent_level * INDENT_SIZE)
+            indent = " " * (line.indent_level * line.indent_size)
             return f"{indent}// {line.comment_content}"
         
         # Skip empty lines
@@ -222,7 +222,7 @@ class BaseArgumentMapStrategy(BaseStrategy):
             return ""
         
         # Build the line with proper indentation
-        indent = " " * (line.indent_level * INDENT_SIZE)
+        indent = " " * (line.indent_level * line.indent_size)
         
         # Add dialectical relation if present
         relation_part = ""

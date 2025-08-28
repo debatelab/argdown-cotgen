@@ -34,6 +34,7 @@ class ArgumentLine:
     line_number: int
     original_line: str
     has_comment: bool = False
+    indent_size: int = INDENT_SIZE
     comment_content: Optional[str] = None
     yaml_inline_data: Optional[str] = None
 

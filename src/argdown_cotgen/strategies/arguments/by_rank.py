@@ -39,7 +39,7 @@ Note: Propositions rendered as premises in previous steps become conclusions in 
 
 from typing import List, Optional
 from ..base import BaseArgumentStrategy, CotStep, AbortionMixin
-from ...core.models import ArgdownStructure, ArgumentStructure
+from ...core.models import ArgdownStructure, ArgumentStatementLine, ArgumentStructure
 
 
 class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
@@ -73,7 +73,7 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
     ]
     
     SUB_ARGUMENT_EXPLANATIONS = [
-        "I'll add a sub-argument for statement ({number}), which show how it can be derived from other statements.",
+        "I'll add a sub-argument for statement ({number}), which shows how it can be derived from other statements.",
         "Now I'll include the supporting reasoning for statement ({number}).",
         "Let me add the inference step that leads to statement ({number}).",
         "I'll show how statement ({number}) is derived from additional premises.",
@@ -90,8 +90,8 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
     
     YAML_EXPLANATIONS = [
         "I'll add the YAML inline data that provides additional information.",
-        "Now I'll include the metadata and confidence values.",
-        "Let me add the YAML annotations with strength and certainty values.",
+        "Now I'll include the metadata and axtra information.",
+        "Let me add the YAML annotations with further data.",
         "I'll include the inline data that adds context to the statements.",
         "Now I'll add the YAML metadata that enriches the argument."
     ]
@@ -135,22 +135,22 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         steps = []
         
         # Step 1: Title and Gist
-        title_step = self._create_title_step(parsed_structure)
+        title_step = self._create_title_step(parsed_structure, len(steps) + 1)
         if title_step:
             steps.append(title_step)
         
         # Step 2: Scaffold with final conclusion
-        scaffold_step = self._create_scaffold_step(parsed_structure)
+        scaffold_step = self._create_scaffold_step(parsed_structure, len(steps) + 1)
         if scaffold_step:
             steps.append(scaffold_step)
         
         # Step 3: Main inference step
-        main_inference_step = self._create_main_inference_step(parsed_structure)
+        main_inference_step, last_added_intermediate_conclusion = self._create_main_inference_step(parsed_structure, len(steps) + 1)
         if main_inference_step:
             steps.append(main_inference_step)
         
         # Step 4: Add sub-arguments iteratively by rank
-        sub_argument_steps = self._create_sub_argument_steps(parsed_structure, len(steps))
+        sub_argument_steps = self._create_sub_argument_steps(parsed_structure, len(steps), last_added_intermediate_conclusion)
         steps.extend(sub_argument_steps)
         
         # Step 5: Add inference information
@@ -174,8 +174,8 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         
         return steps
     
-    def _create_title_step(self, structure: ArgumentStructure) -> Optional[CotStep]:
-        """Create the title and gist step (v1)."""
+    def _create_title_step(self, structure: ArgumentStructure, step_num: int) -> Optional[CotStep]:
+        """Create the title and gist step."""
         preamble_lines = self._get_preamble_lines(structure)
         if not preamble_lines:
             return None
@@ -183,28 +183,29 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         content = self._format_statement_line(preamble_lines[0])
         explanation = self._get_random_explanation(self.TITLE_EXPLANATIONS)
         
-        return self._create_step("v1", content, explanation)
+        return self._create_step(f"v{step_num}", content, explanation)
     
-    def _create_scaffold_step(self, structure: ArgumentStructure) -> CotStep:
-        """Create the scaffold step with final conclusion (v2)."""
+    def _create_scaffold_step(self, structure: ArgumentStructure, step_num: int) -> CotStep:
+        """Create the scaffold step with final conclusion."""
         final_conclusion = structure.final_conclusion
         scaffold_content = self._create_premise_conclusion_scaffold(structure, final_conclusion)
         explanation = self._get_random_explanation(self.SCAFFOLD_EXPLANATIONS)
         
-        return self._create_step("v2", scaffold_content, explanation)
+        return self._create_step(f"v{step_num}", scaffold_content, explanation)
     
-    def _create_main_inference_step(self, structure: ArgumentStructure) -> Optional[CotStep]:
-        """Create the main inference step (v3)."""
+    def _create_main_inference_step(self, structure: ArgumentStructure, step_num: int) -> tuple[Optional[CotStep], Optional[int]]:
+        """Create the main inference step."""
         # Find the final conclusion and its direct premises
         final_conclusion = structure.final_conclusion
         if not final_conclusion:
-            return None
+            return None, None
             
         # Get the main inference step by finding premises that directly support the final conclusion
         main_premises = self._find_direct_premises_for_conclusion(structure, final_conclusion)
         
         # Build content with preamble, main premises (renumbered), and final conclusion
         lines = []
+        last_added_intermediate_conclusion: int | None = None
         
         # Add preamble if present
         preamble_lines = self._get_preamble_lines(structure)
@@ -219,6 +220,7 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
             if self._is_intermediate_conclusion(structure, premise):
                 note = self._get_random_explanation(self.NOTES_INTERMEDIATE_CONCLUSION)
                 content += f" // {note}"
+                last_added_intermediate_conclusion = i
             lines.append(f"({i}) {content}")
         
         # Add separator
@@ -232,34 +234,41 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         content = '\n'.join(lines)
         explanation = self._get_random_explanation(self.MAIN_INFERENCE_EXPLANATIONS)
         
-        return self._create_step("v3", content, explanation)
+        return self._create_step(f"v{step_num}", content, explanation), last_added_intermediate_conclusion
     
-    def _create_sub_argument_steps(self, structure: ArgumentStructure, step_count: int) -> List[CotStep]:
+    def _create_sub_argument_steps(self, structure: ArgumentStructure, step_count: int, last_added_intermediate_conclusion: int | None) -> List[CotStep]:
         """Create sub-argument steps (v4+)."""
         steps: List[CotStep] = []
         final_conclusion = structure.final_conclusion
         if not final_conclusion:
             return steps
-            
-        # Find all statements that need sub-arguments (premises that are also conclusions)
-        main_premises = self._find_direct_premises_for_conclusion(structure, final_conclusion)
-        statements_needing_support = [p for p in main_premises if self._has_supporting_premises(structure, p)]
+
+        # Find ALL intermediate conclusions, not just those that are main premises
+        all_intermediate_conclusions = []
+        for statement in structure.numbered_statements:
+            if self._is_intermediate_conclusion(structure, statement):
+                all_intermediate_conclusions.append(statement)
+        if not all_intermediate_conclusions:
+            return steps    
         
         # Sort by statement number to ensure consistent ordering
-        statements_needing_support.sort(key=lambda x: x.statement_number or 0)
-        
-        for i, statement in enumerate(statements_needing_support):
+        all_intermediate_conclusions.sort(key=lambda x: x.statement_number or 0, reverse=True)
+
+        # Target label for explanations
+        target_label = last_added_intermediate_conclusion
+
+        # Create step with intermediate conclusions (i1) (i1,i2) (i1,i2,i3) etc 
+        for i in range(len(all_intermediate_conclusions)):
             step_version = f"v{step_count + i + 1}"
-            sub_arg_content = self._build_sub_argument_content(structure, statement)
-            
-            # Find the renumbered position of this statement in the main inference step (v3)
-            renumbered_position = self._find_renumbered_position(statement, main_premises)
+            assert target_label is not None, "target_label should be provided if there are intermediate conclusions to expand."
+            sub_arg_content, next_target_label = self._build_sub_argument_content(structure, all_intermediate_conclusions, i+1)
             
             explanation = self._get_random_explanation(
                 self.SUB_ARGUMENT_EXPLANATIONS, 
-                number=renumbered_position
+                number=target_label
             )
             steps.append(self._create_step(step_version, sub_arg_content, explanation))
+            target_label = next_target_label
         
         return steps
     
@@ -297,7 +306,7 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         
         return self._create_step(f"v{step_count + 1}", content, explanation)
     
-    def _find_direct_premises_for_conclusion(self, structure: ArgumentStructure, conclusion):
+    def _find_direct_premises_for_conclusion(self, structure: ArgumentStructure, conclusion: ArgumentStatementLine | None):
         """Find premises that directly support a given conclusion by looking at inference rules."""
         if not conclusion or not conclusion.statement_number:
             return []
@@ -353,74 +362,74 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
             # Find statements numbered just before this conclusion
             candidates = [stmt for stmt in numbered_statements 
                          if stmt.statement_number and stmt.statement_number < conclusion_num]
-            # Take the most recent 1-2 statements as likely premises
-            if candidates:
-                premises_for_conclusion = candidates[-2:] if len(candidates) > 1 else candidates[-1:]
+            # Take all preceeding statements up to previous inference line (if any) as likely premises
+            premises_for_conclusion: List[ArgumentStatementLine] = []
+            for line in reversed(structure.lines[:conclusion.line_number - 1]):
+                if premises_for_conclusion and (line.is_inference_rule or line.is_separator):
+                    break
+                if line in candidates:
+                    premises_for_conclusion.append(line)
+
+            # Reverse to maintain original order
+            premises_for_conclusion.reverse()
         
         return premises_for_conclusion
     
-    def _has_supporting_premises(self, structure: ArgumentStructure, statement):
-        """Check if a statement has supporting premises (i.e., is derived from other statements)."""
-        if not statement.statement_number:
-            return False
-            
-        numbered_statements = self._get_numbered_statements(structure)
-        return any(s.statement_number and s.statement_number < statement.statement_number 
-                  for s in numbered_statements)
-    
-    def _build_sub_argument_content(self, structure: ArgumentStructure, target_statement):
+    def _build_sub_argument_content(self, structure: ArgumentStructure, intermediate_conclusions: List[ArgumentStatementLine], num_intermediate_conclusions_to_show: int) -> tuple[str, int | None]:
         """Build content for a sub-argument by expanding from the main inference step."""
+
+        # TODO: rewrite 
+        # Go through the structure line by line, counting statements that have been added
+        # If LINE is either 
+        # - the final conclusion
+        # - a direct premise for the final conclusion
+        # - an intermediate conclusion in the list or
+        # - a direct premise for any of the intermediate conclusions in the list
+        # then add it to the sub-argument, renumbering as we go
+        # If LINE is a conclusion (final or intermediate), add a separator line before it
+
         final_conclusion = structure.final_conclusion
-        main_premises = self._find_direct_premises_for_conclusion(structure, final_conclusion)
-        
-        lines = []
-        
+        assert final_conclusion is not None, "Final conclusion is required to build sub-argument content."
+        revealed_intermediate_conclusions = intermediate_conclusions[:num_intermediate_conclusions_to_show]
+
+
+        revealed_statements: List[ArgumentStatementLine] = []
+        for concl in revealed_intermediate_conclusions + [final_conclusion]:
+            revealed_statements.extend(self._find_direct_premises_for_conclusion(structure, concl))
+        revealed_statements.extend(revealed_intermediate_conclusions)
+        revealed_statements.append(final_conclusion)
+        revealed_statements = [s for e, s in enumerate(revealed_statements) if revealed_statements.index(s) == e]  # remove duplicates
+
+        lines: List[str] = []
+
         # Add preamble if present
         preamble_lines = self._get_preamble_lines(structure)
         if preamble_lines:
             lines.append(self._format_statement_line(preamble_lines[0]))
             lines.append("")
         
-        # Build the expanded argument by adding the sub-premises for the target statement
-        statement_counter = 1
-        
-        # Find sub-premises for the target statement
-        sub_premises = self._find_direct_premises_for_conclusion(structure, target_statement)
-        
-        # Add all sub-premises first
-        for sub_premise in sub_premises:
-            content = self._extract_statement_content(sub_premise)
-            lines.append(f"({statement_counter}) {content}")
-            statement_counter += 1
-        
-        # Add inference rule for the target statement if it exists
-        inference_rule = self._find_inference_rule_for_statement(structure, target_statement)
-        if inference_rule:
-            rule_content = self._renumber_inference_rule(inference_rule.content, sub_premises)
-            lines.append(rule_content)
-        
-        # Add the target statement itself
-        target_content = self._extract_statement_content(target_statement)
-        lines.append(f"({statement_counter}) {target_content}")
-        statement_counter += 1
-        
-        # Add other main premises (if any) that are not the target statement
-        for premise in main_premises:
-            if premise.statement_number != target_statement.statement_number:
-                content = self._extract_statement_content(premise)
-                lines.append(f"({statement_counter}) {content}")
-                statement_counter += 1
-        
-        # Add separator
-        lines.append("-----")
-        
-        # Add final conclusion
-        conclusion_content = self._extract_statement_content(final_conclusion)
-        lines.append(f"({statement_counter}) {conclusion_content}")
-        
-        return '\n'.join(lines)
+        label_counter = 1
+        label_of_last_added_intermediate_conclusion: int | None = None
+
+        for line in structure.lines:
+            if not line.is_numbered_statement:
+                continue
+            if line in revealed_intermediate_conclusions or line == final_conclusion:
+                lines.append("-----")
+            if line in revealed_statements:
+                if line in intermediate_conclusions[num_intermediate_conclusions_to_show:]:
+                    note = "  // " + self._get_random_explanation(self.NOTES_INTERMEDIATE_CONCLUSION)
+                    label_of_last_added_intermediate_conclusion = label_counter
+                else:
+                    note = ""
+                content = self._extract_statement_content(line)
+                lines.append(f"({label_counter}) {content}{note}")
+                label_counter += 1
+
+        return '\n'.join(lines), label_of_last_added_intermediate_conclusion
+
     
-    def _extract_statement_content(self, statement):
+    def _extract_statement_content(self, statement: ArgumentStatementLine):
         """Extract the content of a statement without the number prefix."""
         content = statement.content.strip()
         # Remove the number prefix like "(1) " from the content
@@ -487,19 +496,23 @@ class ByRankStrategy(AbortionMixin, BaseArgumentStrategy):
         """
         Check if a statement is derived by an inference rule.
         
-        A statement is derived if it's the first statement to appear after an inference line.
+        A statement is derived if it's the first statement to appear after an inference line (i.e., inference_rule OR separator line).
         """
         if not statement.line_number:
             return False
             
+        # Get both inference rules and separator lines
         inference_rules = self._get_inference_rules(structure)
+        separator_lines = [line for line in structure.lines if line.is_separator]
+        all_rule_lines = inference_rules + separator_lines
+        
         numbered_statements = self._get_numbered_statements(structure)
         
-        for rule in inference_rules:
+        for rule in all_rule_lines:
             if not rule.line_number:
                 continue
                 
-            # Find the first statement line that appears after this inference rule
+            # Find the first statement line that appears after this inference rule or separator
             first_statement_after_rule = None
             min_line_number = float('inf')
             
